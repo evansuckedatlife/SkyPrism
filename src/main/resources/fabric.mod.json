@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "${id}",
+  "version": "${version}",
+  "name": "${name}",
+  "description": "A Fabric client mod for Hypixel SkyBlock.",
+  "authors": [
+    "evansuckedatlife"
+  ],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.skyprism.SkyPrismClient"
+    ],
+    "modmenu": [
+      "com.skyprism.mc.gui.ModMenuIntegration"
+    ]
+  },
+  "mixins": [
+    "skyprism.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "fabric-api": "*",
+    "minecraft": "~${minecraft}",
+    "java": ">=25"
+  },
+  "recommends": {
+    "yet_another_config_lib_v3": ">=3.9.5"
+  }
+}
