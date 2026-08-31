@@ -29,8 +29,15 @@
     "'glint': true adds the enchantment shimmer. SkyBlock draws every Enchanted <x> with a",
     "glint, so mirroring that is what keeps Ancient Claw and Enchanted Ancient Claw -- both",
     "flint -- apart on the reel, and likewise Hilt of Revelations and Daedalus Stick, both a",
-    "stick, and Fine and Flawless gemstones of one colour, and Fish the Rabbit and the Golden",
-    "Rabbit it shares a Chocolate Factory table with.",
+    "stick, and Fine and Flawless gemstones of one colour.",
+    "",
+    "GLINT IS NOT AVAILABLE ON EVERY ITEM. Five ids used below already carry",
+    "enchantment_glint_override=true as a DEFAULT data component on both 26.1.2 and 26.2 --",
+    "enchanted_book, end_crystal, experience_bottle, nether_star and written_book -- so",
+    "'glint': true on one of those is a no-op and CANNOT separate two rows. That is a real bug",
+    "that shipped: the Grand and the Titanic Experience Bottle were one exp bottle apart by",
+    "glint alone, and they land on the same Ender Node, so the reel showed the same picture",
+    "twice. Two rows that share one of those five ids must never sit in one source's list.",
     "",
     "'names' are display names as Hypixel writes them in chat. Matching is case-insensitive,",
     "whitespace-collapsed, formatting-code-stripped, and ignores a leading or trailing count",
@@ -45,7 +52,15 @@
     "",
     "Drop tables read from https://hypixelskyblock.minecraft.wiki -- the Mythological Ritual",
     "and Griffin Burrow pages on 2026-08-29, and the slayer, Catacombs, Kuudra, Crystal",
-    "Hollows, Glacite, fishing, foraging, Garden, Hoppity and Rift pages on 2026-08-30."
+    "Hollows, Glacite, fishing, foraging, Garden, Hoppity and Rift pages on 2026-08-30.",
+    "",
+    "WHERE THE NAMES ARE CHECKED. Every name in this file is now pinned by",
+    "SkyBlockNameSnapshotTest against skyblock_item_names.tsv, a snapshot generated from the",
+    "NotEnoughUpdates item repository. A name that no longer resolves to a real SkyBlock item",
+    "fails the build, which is what \"Chimera\", \"Enchanted Ancient Claws\", \"Soul Esperance\" and",
+    "thirty-odd others needed and did not have -- they survived several review passes because",
+    "nothing checked. The handful of rows that legitimately name something that is not an item",
+    "(coins, chest tiers, the Carnival fruits) sit on that test's allowlist with a reason each."
   ],
 
   "fallback": "minecraft:chest",
@@ -83,12 +98,6 @@
       "why": "SkyBlock draws coin amounts as gold nuggets in its own menus."
     },
     {
-      "names": ["Experience Orbs", "Experience Orb"],
-      "item": "minecraft:experience_bottle",
-      "why": "The vanilla sprite for bottled experience."
-    },
-
-    {
       "names": ["Ancient Claw", "Ancient Claws"],
       "item": "minecraft:flint",
       "why": "Wiki shows Flint.png."
@@ -100,7 +109,7 @@
       "why": "Wiki shows Enchanted_Flint.png; the glint is what separates it from the plain claw."
     },
     {
-      "names": ["Enchanted Gold", "Enchanted Gold Ingot", "Enchanted Gold Ingots"],
+      "names": ["Enchanted Gold Ingot", "Enchanted Gold Ingots"],
       "item": "minecraft:gold_ingot",
       "glint": true,
       "why": "Hypixel writes this drop both ways; both are the enchanted gold ingot."
@@ -112,7 +121,7 @@
       "why": "The 160-ingot compressed form; a block sprite, not an ingot one."
     },
     {
-      "names": ["Enchanted Iron", "Enchanted Iron Ingot", "Enchanted Iron Ingots"],
+      "names": ["Enchanted Iron Ingot", "Enchanted Iron Ingots"],
       "item": "minecraft:iron_ingot",
       "glint": true,
       "why": "Straight vanilla base item plus SkyBlock's enchanted shimmer."
@@ -135,7 +144,6 @@
       "glint": true,
       "why": "Custom texture tinted #6F6F0C, a dark olive-yellow. Yellow dye is the nearest vanilla dye sprite, and the dye silhouette is the point -- a player who sees a dye on a Diana reel knows exactly which 1-in-50,000 they just hit. Glinted because SkyBlock draws its dyes glinted."
     },
-
     {
       "names": ["Hilt of Revelations"],
       "item": "minecraft:stick",
@@ -147,7 +155,7 @@
       "why": "Custom texture. A crocheted toy is yarn, and orange wool is the closest 'fuzzy orange thing' vanilla has; distinct from the yellow wool used for Shimmering Wool."
     },
     {
-      "names": ["Washed-up Souvenir", "Washed up Souvenir"],
+      "names": ["Washed-up Souvenir"],
       "item": "minecraft:nautilus_shell",
       "why": "Custom texture. A keepsake left by a Stranded Nymph; the nautilus shell is vanilla's beachcombing find."
     },
@@ -206,7 +214,7 @@
       "why": "Custom texture. Pointed dripstone is vanilla's barbed spike, which is what a manticore stinger is."
     },
     {
-      "names": ["Manti-core", "Manticore Core"],
+      "names": ["Manti-core"],
       "item": "minecraft:heart_of_the_sea",
       "why": "Custom texture. Its tooltip calls it 'an array of cells from different creatures mashed together'; the heart of the sea is vanilla's organic core sprite."
     },
@@ -222,18 +230,11 @@
       "glint": true,
       "why": "Wiki shows Enchanted_Yellow_Wool.png -- the golden fleece, shimmering, hence the glint."
     },
-
     {
-      "names": [
-        "Minos Hunter Shard", "Siamese Lynxes Shard", "Stranded Nymph Shard",
-        "Cretan Bull Shard", "Harpy Shard", "Gaia Construct Shard",
-        "Minotaur Shard", "Minos Champion Shard", "Sphinx Shard",
-        "Minos Inquisitor Shard", "Manticore Shard", "King Minos Shard"
-      ],
+      "names": ["Minos Hunter Shard", "Cretan Bull Shard", "Harpy Shard", "Minotaur Shard", "Sphinx Shard", "King Minos Shard"],
       "item": "minecraft:prismarine_shard",
-      "why": "Hunting shards, one per creature. They share a single shard silhouette in SkyBlock too; the reel label carries which creature it came from. Prismarine rather than amethyst so a shard is never mistaken for a Mythos Fragment."
+      "why": "The six Mythological attribute shards, all on the prismarine shard because they are one family and no source pays two of them in the reel-checked lists. Six invented shard names were removed from this row; these six are the only Diana shards that exist."
     },
-
     {
       "names": ["Ancestral Spade", "Archaic Spade", "Deific Spade"],
       "item": "minecraft:golden_shovel",
@@ -241,11 +242,10 @@
       "why": "Not a burrow drop, but a Diana player's own tool turns up in chat capture and replays; the golden shovel is the spade."
     },
     {
-      "names": ["Griffin", "Griffin Pet"],
+      "names": ["Griffin"],
       "item": "minecraft:feather",
       "why": "Same reason as the feather it sheds."
     },
-
     {
       "names": ["Judgement Core"],
       "item": "minecraft:echo_shard",
@@ -272,7 +272,7 @@
       "why": "Vanilla's Warden grows its biome from the sculk catalyst, which is drawn as a dark bulb with a beating orange core -- a heart, from the creature the drop is named after."
     },
     {
-      "names": ["Void Conqueror Enderman Skin", "Void Conqueror Skin"],
+      "names": ["Void Conqueror Enderman Skin"],
       "item": "minecraft:player_head",
       "why": "A cosmetic skin. Hypixel serves skins as textured player heads, so the vanilla player head is not a lookalike, it is the same object class."
     },
@@ -282,7 +282,7 @@
       "why": "A goblet of blood. Vanilla owns no cup, but the potion is its only vessel drawn full of coloured liquid, and full is the half of the picture that matters."
     },
     {
-      "names": ["Etherwarp Merger", "Etherwarp Conduit", "Etherwarp Transmission"],
+      "names": ["Etherwarp Merger", "Etherwarp Conduit"],
       "item": "minecraft:end_crystal",
       "why": "Teleport hardware. The obvious choice was the eye of ender, and it was wrong: the wiki's Voidgloom Seraph table drops Summoning Eye out of the same fight, and Summoning Eye IS the vanilla eye of ender, so the two would have landed on one picture. The end crystal is the other End machine, it is violet and ringed like the Merger, and it is unclaimed."
     },
@@ -337,11 +337,6 @@
       "why": "A device that inverts a Blaze Slayer's heat into cold. Blue ice is the coldest thing vanilla draws and the only one that reads as made rather than fallen."
     },
     {
-      "names": ["Bundle of Magma"],
-      "item": "minecraft:fire_charge",
-      "why": "A packed charge of molten material. Magma cream would have been the closer word, but the wiki's Inferno Demonlord table also drops Magma Cream Distillate, which has the better claim on it; the fire charge is the same idea contained rather than loose."
-    },
-    {
       "names": ["Revenant Viscera"],
       "item": "minecraft:porkchop",
       "why": "Raw organs from the zombie boss. Raw porkchop is vanilla's unmistakably raw cut, and it is distinct from the rotten flesh already spoken for."
@@ -360,11 +355,6 @@
       "names": ["Fly Swatter"],
       "item": "minecraft:wooden_shovel",
       "why": "A flat paddle on a handle, which is what vanilla's wooden shovel is at 16x16 and what a swatter is at any size."
-    },
-    {
-      "names": ["Grizzly Bait"],
-      "item": "minecraft:cooked_beef",
-      "why": "Meat left out to draw a Sven pack. Cooked beef is vanilla's bait-sized cut."
     },
     {
       "names": ["Red Claw Egg"],
@@ -392,24 +382,9 @@
       "why": "Same family; this is the one that drops beside Spider Catalyst, so it takes the most potent-looking bottle vanilla has."
     },
     {
-      "names": ["Wolf Catalyst"],
+      "names": ["Weak Wolf Catalyst"],
       "item": "minecraft:honey_bottle",
-      "why": "Same family; the honey bottle's amber is the closest to the Wolf catalyst's colour."
-    },
-    {
-      "names": ["Ender Catalyst"],
-      "item": "minecraft:lingering_potion",
-      "why": "Same family; the lingering potion is the violet one."
-    },
-    {
-      "names": ["Blaze Catalyst"],
-      "item": "minecraft:cauldron",
-      "why": "Same family; the cauldron is the vessel that sits over a fire."
-    },
-    {
-      "names": ["Vampire Catalyst"],
-      "item": "minecraft:splash_potion",
-      "why": "Same family; the splash potion is the one drawn full of red."
+      "why": "A brewed booster, so a bottle of something. The honey bottle is the only vanilla bottle left after the other catalysts took the brewing stand, the glass bottle and the dragon breath. Note this is not a Sven drop -- the wiki lists no catalyst on his table -- it is a bazaar item a player can still see in chat."
     },
     {
       "names": ["Enchant Rune", "Enchant Rune I"],
@@ -527,18 +502,12 @@
       "why": "The third blade a Necron chest can pay, so it cannot repeat either of the two above. Stone is the greyest blade vanilla has, closest to the Fury's shadow-grey."
     },
     {
-      "names": [
-        "First Master Star", "Second Master Star", "Third Master Star", "Fourth Master Star",
-        "Fifth Master Star", "Master Star"
-      ],
+      "names": ["First Master Star", "Second Master Star", "Third Master Star", "Fourth Master Star", "Fifth Master Star"],
       "item": "minecraft:nether_star",
       "why": "One row for all five stars, because they are the same star at five tiers and only one drops at a time. The nether star is a star dropped by a wither, which is the provenance exactly."
     },
     {
-      "names": [
-        "Master Skull - Tier 1", "Master Skull - Tier 2", "Master Skull - Tier 3",
-        "Master Skull - Tier 4", "Master Skull - Tier 5", "Master Skull"
-      ],
+      "names": ["Master Skull - Tier 1", "Master Skull - Tier 2", "Master Skull - Tier 3", "Master Skull - Tier 4", "Master Skull - Tier 5"],
       "item": "minecraft:wither_skeleton_skull",
       "why": "Wiki shows a wither skeleton skull, which is what they are made from and what vanilla calls the item."
     },
@@ -548,7 +517,7 @@
       "why": "The powder a wither is summoned over. Soul sand is that powder in vanilla, and it is not the skull directly above it."
     },
     {
-      "names": ["Essence", "Wither Essence", "Undead Essence", "Spider Essence", "Dragon Essence", "Gold Essence", "Diamond Essence", "Ice Essence", "Crimson Essence"],
+      "names": ["Wither Essence", "Undead Essence", "Spider Essence", "Dragon Essence", "Gold Essence", "Diamond Essence", "Ice Essence", "Crimson Essence"],
       "item": "minecraft:ghast_tear",
       "why": "Dungeon essence is the most common line in a reward chest and had no row, so it drew the fallback chest next to Necron's Handle and the Wither Catalyst. Custom texture in SkyBlock -- a pale glowing droplet, one tint per type. The ghast tear is vanilla's pale glowing droplet and is unused by any other row. One row answers every type because the reel cares that essence is not a chest, not which essence it was; the count that matters is already drawn as the xN."
     },
@@ -583,9 +552,9 @@
       "why": "Wiki shows a short gold blade. The golden sword is short and gold."
     },
     {
-      "names": ["Machine Gun Bow"],
+      "names": ["Machine Gun Shortbow"],
       "item": "minecraft:bow",
-      "why": "It is a bow."
+      "why": "Wiki shows a bow. The vanilla bow is the same object; the mod used to call it \"Machine Gun Bow\", which is not what Hypixel calls it."
     },
     {
       "names": ["Necron's Helmet"],
@@ -713,14 +682,9 @@
       "why": "A cold blue gem-shaped currency dropped by ghosts. Lapis is vanilla's blue gem and nothing else in the Mist table is blue."
     },
     {
-      "names": ["Bag of Cash"],
-      "item": "minecraft:bundle",
-      "why": "A bag. The bundle is vanilla's only drawstring bag, and it must not be the coin nugget, because the ghost table pays coins separately in the same roll."
-    },
-    {
-      "names": ["Ghost Cutlass"],
-      "item": "minecraft:iron_sword",
-      "why": "A plain curved blade. The iron sword is the plain blade; the dungeon greatswords hold netherite, diamond and stone, so nothing collides."
+      "names": ["Ghostly Boots"],
+      "item": "minecraft:chainmail_boots",
+      "why": "The Ghost's rare armour drop is boots, not a cutlass -- there is no \"Ghost Cutlass\". Chainmail boots are the pale grey vanilla boot."
     },
     {
       "names": ["Plasma"],
@@ -744,7 +708,7 @@
       "why": "A dragon pet. The dragon head is vanilla's dragon, and the glint marks the golden tier apart from the Superior Dragon Fragment that uses the same head plain."
     },
     {
-      "names": ["Ender Dragon", "Ender Dragon Pet"],
+      "names": ["Ender Dragon"],
       "item": "minecraft:ender_dragon_spawn_egg",
       "why": "A dragon pet, and vanilla ships a spawn egg for exactly this dragon."
     },
@@ -810,12 +774,12 @@
       "why": "The item that summons Arachne. The spider eye is vanilla's spider-summoning ingredient and its unmistakable spider sprite."
     },
     {
-      "names": ["Arachne's Keeper Fragment"],
+      "names": ["Arachne Fragment"],
       "item": "minecraft:fermented_spider_eye",
-      "why": "The second spider item in the same fight, so it takes the fermented eye: same arthropod family, different colour, no chance of the two blurring together."
+      "why": "Custom texture. The fermented spider eye is the sickly-green spider part vanilla has, and it stays clear of the plain spider eye that Arachne's Calling uses -- the two are different objects and used to be one row under two names."
     },
     {
-      "names": ["Travel Scroll to Spider's Den Top of Nest", "Travel Scroll"],
+      "names": ["Travel Scroll to Spider's Den Top of Nest"],
       "item": "minecraft:paper",
       "why": "A scroll. Paper is a sheet with a destination written on it."
     },
@@ -825,9 +789,9 @@
       "why": "A gold accessory. The plain gold ingot is free -- Enchanted Gold holds the glinted one -- and it is the only gold in the Trapper table, so the ring and the coin payout never look alike."
     },
     {
-      "names": ["Trapper's Ring"],
+      "names": ["Trapper Crest"],
       "item": "minecraft:copper_ingot",
-      "why": "The second ring in the same reward table, in the other metal SkyBlock draws rings in."
+      "why": "A crest, so a small worn metal badge; the copper ingot is vanilla's only warm metal that the gold ingot (Hunter Ring) has not already taken."
     },
     {
       "names": ["Hunter Talisman"],
@@ -840,34 +804,9 @@
       "why": "A skinning knife: a short plain blade."
     },
     {
-      "names": ["Skin of the Wolf"],
-      "item": "minecraft:leather",
-      "why": "A pelt. Leather is vanilla's pelt."
-    },
-    {
-      "names": ["Ashfang Helmet"],
-      "item": "minecraft:golden_helmet",
-      "why": "Ashfang's set is fiery gold, and gold is the only helmet material in the Crimson miniboss table."
-    },
-    {
-      "names": ["Ashfang Gloves"],
-      "item": "minecraft:leather_horse_armor",
-      "why": "Vanilla has no glove. Leather horse armour is its only dyeable worn-leather sprite -- the right material and the right family -- and it cannot be confused with the helmet or the cloak beside it."
-    },
-    {
-      "names": ["Ashfang Cloak"],
-      "item": "minecraft:elytra",
-      "why": "A cloak worn on the back. The elytra is vanilla's only back-worn cape."
-    },
-    {
-      "names": ["Soul Esperance"],
+      "names": ["Dark Queen's Soul"],
       "item": "minecraft:soul_lantern",
-      "why": "A soul-lit hanging charm, which is what the soul lantern is, and the only blue flame in the Crimson table."
-    },
-    {
-      "names": ["Mageblood Necklace"],
-      "item": "minecraft:heart_of_the_sea",
-      "why": "A pendant with something living sealed inside. The heart of the sea is vanilla's only sealed-organic pendant sprite."
+      "why": "A soul, so the soul lantern -- a caged flame is the closest vanilla draws to a held soul."
     },
     {
       "names": ["Fel Pearl"],
@@ -893,11 +832,6 @@
       "names": ["Heavy Pearl"],
       "item": "minecraft:ender_pearl",
       "why": "A pearl, and the only one in the Kuudra tables."
-    },
-    {
-      "names": ["Reindrake Fragment"],
-      "item": "minecraft:prismarine_shard",
-      "why": "A shard off an ice drake. Prismarine's pale blue-green is the colour, and nothing else in the rare sea-creature table is a shard."
     },
     {
       "names": ["Frozen Blaze Helmet"],
@@ -935,14 +869,14 @@
       "why": "Same family as the Red Goblin Egg; the allay's blue is the blue one."
     },
     {
-      "names": ["Golden Goblin Egg"],
-      "item": "minecraft:piglin_brute_spawn_egg",
-      "why": "Same family; the brute's gold-banded egg is the golden one, and it only ever appears beside the Diamond Goblin Egg, which is pale."
+      "names": ["Green Goblin Egg"],
+      "item": "minecraft:frog_spawn_egg",
+      "why": "The four goblin eggs are colours, and each takes the spawn egg closest to its own: the frog egg is vanilla's green one. There is no golden or diamond goblin egg -- neither NEU nor Hypixel's own resource pack has one."
     },
     {
-      "names": ["Diamond Goblin Egg"],
-      "item": "minecraft:vex_spawn_egg",
-      "why": "Same family; the vex's white-blue is the diamond one."
+      "names": ["Yellow Goblin Egg"],
+      "item": "minecraft:bee_spawn_egg",
+      "why": "The bee egg is vanilla's yellow one; see Green Goblin Egg."
     },
     {
       "names": ["FTX 3070"],
@@ -995,14 +929,9 @@
       "why": "A rope. The lead is vanilla's coiled rope."
     },
     {
-      "names": ["Vanguard Helmet"],
-      "item": "minecraft:netherite_helmet",
-      "why": "The top corpse tier in the top metal. The four corpse helmets take four different materials so a Glacite run never shows the same helmet twice."
-    },
-    {
-      "names": ["Armor of Yog Helmet"],
+      "names": ["Yog Helmet"],
       "item": "minecraft:golden_helmet",
-      "why": "Yog armour is molten orange-gold; gold is the closest armour material and it is none of the other three corpse helmets."
+      "why": "Wiki shows a gold-trimmed helmet. Hypixel calls it \"Yog Helmet\"; ARMOR_OF_YOG_HELMET is only its internal name, which is what the mod used to print."
     },
     {
       "names": ["Mineral Helmet"],
@@ -1025,12 +954,9 @@
       "why": "Not an item at all -- the reward is the shaft opening -- so the reel shows the ice it opens in. Blue ice is the deepest, most deliberate-looking ice vanilla has."
     },
     {
-      "names": [
-        "Ugly Fossil", "Webbed Fossil", "Claw Fossil", "Footprint Fossil", "Spine Fossil",
-        "Rib Fossil", "Helix Fossil", "Fossil"
-      ],
+      "names": ["Ugly Fossil", "Webbed Fossil", "Claw Fossil", "Footprint Fossil", "Spine Fossil", "Helix Fossil"],
       "item": "minecraft:bone_block",
-      "why": "One row for every fossil: an excavation yields one at a time, they are the same object at different completeness, and a bone block is a fossil set in stone."
+      "why": "Bone in a block of stone is what every fossil is. The five real fossils plus the two special ones; there is no \"Rib Fossil\" and no bare \"Fossil\"."
     },
     {
       "names": ["Titanium"],
@@ -1064,9 +990,7 @@
       "why": "The top grades of Ruby, which SkyBlock draws with a shimmer the lower grades do not have -- and that shimmer is the only thing separating this reel from the Fine grade beside it."
     },
     {
-      "names": [
-        "Rough Amethyst Gemstone", "Flawed Amethyst Gemstone", "Fine Amethyst Gemstone"
-      ],
+      "names": ["Rough Amethyst Gemstone", "Flawed Amethyst Gemstone", "Fine Amethyst Gemstone"],
       "item": "minecraft:amethyst_shard",
       "why": "The lower three grades of Amethyst. Vanilla's amethyst shard is the same gem under the same name. Split from the top grades because a Glacite corpse can pay two grades of one gem at once, and two reels showing the same sprite is the failure this whole table exists to stop."
     },
@@ -1099,9 +1023,7 @@
       "why": "The top grades of Amber, which SkyBlock draws with a shimmer the lower grades do not have -- and that shimmer is the only thing separating this reel from the Fine grade beside it. The Crystal Nucleus crystal of the same colour rides along: it is the same gem, and the five crystals stay five different pictures because the five colours do."
     },
     {
-      "names": [
-        "Rough Sapphire Gemstone", "Flawed Sapphire Gemstone", "Fine Sapphire Gemstone"
-      ],
+      "names": ["Rough Sapphire Gemstone", "Flawed Sapphire Gemstone", "Fine Sapphire Gemstone"],
       "item": "minecraft:lapis_lazuli",
       "why": "The lower three grades of Sapphire. Sapphire is deep blue, and lapis is vanilla's deep blue gem. Split from the top grades because a Glacite corpse can pay two grades of one gem at once, and two reels showing the same sprite is the failure this whole table exists to stop."
     },
@@ -1156,9 +1078,7 @@
       "why": "The top grades of Onyx, which SkyBlock draws with a shimmer the lower grades do not have -- and that shimmer is the only thing separating this reel from the Fine grade beside it."
     },
     {
-      "names": [
-        "Rough Aquamarine Gemstone", "Flawed Aquamarine Gemstone", "Fine Aquamarine Gemstone"
-      ],
+      "names": ["Rough Aquamarine Gemstone", "Flawed Aquamarine Gemstone", "Fine Aquamarine Gemstone"],
       "item": "minecraft:prismarine_crystals",
       "why": "The lower three grades of Aquamarine. Aquamarine is sea-blue, which is what prismarine crystals are. Split from the top grades because a Glacite corpse can pay two grades of one gem at once, and two reels showing the same sprite is the failure this whole table exists to stop."
     },
@@ -1282,34 +1202,14 @@
       "why": "The third of the Jawbus payout, and the second chest in that frame. An urchin is a spiny sea growth; the fire coral fan is vanilla's spiny sea growth and its red-orange is the magma half of the name. Unused elsewhere, so it cannot collide with the scute beside it."
     },
     {
-      "names": ["Lord Jawbus"],
-      "item": "minecraft:strider_spawn_egg",
-      "why": "A lava-dwelling pet, and the strider is vanilla's lava dweller."
-    },
-    {
-      "names": ["Thunder"],
-      "item": "minecraft:magma_cube_spawn_egg",
-      "why": "The other lava sea creature, so the other lava mob: the magma cube, which will never be mistaken for the strider beside it."
-    },
-    {
       "names": ["Magma Lord Fragment"],
       "item": "minecraft:magma_cream",
       "why": "A piece of molten matter, which is magma cream."
     },
     {
-      "names": ["Plhlegblast Pearl"],
-      "item": "minecraft:ender_pearl",
-      "why": "A pearl, and the only one in the rare sea-creature table."
-    },
-    {
-      "names": ["Shark Tooth Necklace"],
+      "names": ["Raggedy Shark Tooth Necklace", "Dull Shark Tooth Necklace", "Honed Shark Tooth Necklace", "Sharp Shark Tooth Necklace", "Razor-sharp Shark Tooth Necklace"],
       "item": "minecraft:bone",
-      "why": "A tooth on a cord. Vanilla's bone is its tooth-and-cord shape and no other bone appears in this table."
-    },
-    {
-      "names": ["Sea Emperor Fragment"],
-      "item": "minecraft:heart_of_the_sea",
-      "why": "A piece of the Sea Emperor. The heart of the sea is the emperor's own relic in vanilla terms and the only blue in the table."
+      "why": "A tooth, so the bone. There is no tierless \"Shark Tooth Necklace\" item -- every one of the five is its own item and Hypixel prints the tier, so all five are listed rather than a base name that would never match."
     },
     {
       "names": ["Tree the Fish"],
@@ -1317,9 +1217,9 @@
       "why": "A fish, out of a tree. There is no vanilla sprite for the joke, so it takes the plain fish and lets the label underneath do the rest."
     },
     {
-      "names": ["Chameleon"],
+      "names": ["Chameleon Shard"],
       "item": "minecraft:axolotl_spawn_egg",
-      "why": "A colour-changing small reptile pet. The axolotl is vanilla's colour-varying small amphibian and its egg is the closest read."
+      "why": "Attribute shards of a creature take that creature's spawn egg, which is the only vanilla family with enough members to keep them apart. The axolotl is vanilla's colour-changing lizard."
     },
     {
       "names": ["Deep Root"],
@@ -1327,14 +1227,14 @@
       "why": "A root pulled from under a tree. Hanging roots are vanilla's roots."
     },
     {
-      "names": ["Foraging Wisdom Booster"],
+      "names": ["Common Foraging Wisdom Booster"],
       "item": "minecraft:experience_bottle",
-      "why": "A consumable that grants experience faster. Bottled experience is vanilla's consumable that grants experience."
+      "why": "Wiki shows an experience bottle. Boosters ship at a rarity and Hypixel prints it: the item is \"Common Foraging Wisdom Booster\", never the bare noun."
     },
     {
-      "names": ["Sweep Booster"],
+      "names": ["Common Sweep Booster"],
       "item": "minecraft:iron_axe",
-      "why": "Sweep is the stat that widens a foraging swing, and the axe is the swing."
+      "why": "An axe booster, so the iron axe. Same rarity-prefix note as the wisdom booster."
     },
     {
       "names": ["Vinesap"],
@@ -1352,19 +1252,19 @@
       "why": "Something that strengthens a signal on the way through -- the repeater, which shares nothing with the tree gift's other two rows."
     },
     {
-      "names": ["Dreadwing"],
+      "names": ["Dreadwing Shard"],
       "item": "minecraft:phantom_spawn_egg",
-      "why": "A winged night creature that falls out of a tree, and the phantom is vanilla's winged night creature."
+      "why": "The phantom spawn egg: Dreadwing is the Galatea phantom, and the shard is what actually drops -- the creature itself is not an item."
     },
     {
-      "names": ["Grizzly Bear"],
+      "names": ["Grizzly Bear Shard"],
       "item": "minecraft:polar_bear_spawn_egg",
-      "why": "A bear. Vanilla's only bear."
+      "why": "The polar bear spawn egg, vanilla's only bear. Kept as a row because the shard is real, but it is not on the phantom-tree table: the wiki's phantom creatures are Phanpyre, Phanflare and Dreadwing."
     },
     {
-      "names": ["Puck"],
+      "names": ["Puck Shard"],
       "item": "minecraft:allay_spawn_egg",
-      "why": "A small flitting sprite, which is what the allay is."
+      "why": "The allay spawn egg -- a small pale sprite of a creature. Same note as Grizzly Bear Shard: real item, not phantom-tree loot."
     },
     {
       "names": ["Forest Essence"],
@@ -1432,14 +1332,14 @@
       "why": "An overgrown nether wart. The block is the overgrown form, and using it rather than a glinted wart keeps it clear of Enchanted Nether Wart."
     },
     {
-      "names": ["Pesterminator"],
+      "names": ["Pesterminator", "Pesterminator I"],
       "item": "minecraft:enchanted_book",
-      "why": "An ultimate enchantment, which Hypixel hands over as a book."
+      "why": "An enchantment, not an item: the Beetle pest drops it as an Enchanted Book, so the enchanted book is literally right. Both the tiered spelling Hypixel prints and the bare one are listed, because a trailing roman numeral is retried but a missing one is not."
     },
     {
-      "names": ["Ultimate Sunset"],
+      "names": ["Sunset", "Sunset I"],
       "item": "minecraft:knowledge_book",
-      "why": "The second enchantment book in the same pest table, so the other book vanilla has: the knowledge book, whose gold cover reads as the rarer of the pair."
+      "why": "Also an enchantment on an Enchanted Book, and it shares the Garden pest table with Pesterminator -- so it deliberately takes the knowledge book rather than the enchanted book, because two pest drops must not draw one picture. The mod used to call it \"Ultimate Sunset\", which is the internal id, not the name in chat."
     },
     {
       "names": ["Space Helmet"],
@@ -1467,9 +1367,9 @@
       "why": "Cloth tied round the head. The leather helmet is vanilla's dyeable cloth headpiece; the Space Helmet holds the hard-shell one, so the pair never repeats."
     },
     {
-      "names": ["Cryopowder Shard"],
+      "names": ["Fragmented Cryopowder"],
       "item": "minecraft:prismarine_crystals",
-      "why": "A shard of frozen powder. Prismarine crystals are the pale ice-blue shard and nothing else in a Winter Gift is a shard."
+      "why": "Wiki shows a pale blue shard. Prismarine crystals are vanilla's pale blue shard. Hypixel calls it \"Fragmented Cryopowder\"; CRYOPOWDER_SHARD is the internal name."
     },
     {
       "names": ["Snow Suit Helmet"],
@@ -1528,40 +1428,9 @@
       "why": "A wrapped present. The red shulker box is a closed coloured box with a lid, which is the present -- and deliberately not a chest, because the chest is this table's own word for 'unknown'."
     },
     {
-      "names": ["El Dorado"],
-      "item": "minecraft:golden_carrot",
-      "why": "The golden rabbit's prize. A golden carrot is gold and it is what a rabbit wants, which is as close as vanilla gets to the joke."
-    },
-    {
       "names": ["Rabbit the Fish"],
       "item": "minecraft:tropical_fish",
       "why": "Half of a matched pair of jokes: this one is the fish, so it gets the fish."
-    },
-    {
-      "names": ["Fish the Rabbit"],
-      "item": "minecraft:rabbit_spawn_egg",
-      "why": "The other half: this one is the rabbit, so it gets the rabbit."
-    },
-    {
-      "names": ["Golden Rabbit"],
-      "item": "minecraft:rabbit_spawn_egg",
-      "glint": true,
-      "why": "The gilded stray, which shares the Chocolate Factory table with Fish the Rabbit -- so the glint is the whole difference, and it is the right difference, because the gold is what makes this one worth celebrating."
-    },
-    {
-      "names": ["Solomon"],
-      "item": "minecraft:rabbit_foot",
-      "why": "A named rabbit, in a table that already holds two rabbit spawn eggs. The rabbit's foot keeps the animal and drops the egg."
-    },
-    {
-      "names": ["Side Dish"],
-      "item": "minecraft:cookie",
-      "why": "A small chocolate treat out of the Chocolate Factory. The cookie is vanilla's chocolate-chip sprite."
-    },
-    {
-      "names": ["Chocolate"],
-      "item": "minecraft:cocoa_beans",
-      "why": "Chocolate comes from cocoa."
     },
     {
       "names": ["Shiny Token"],
@@ -1574,14 +1443,9 @@
       "why": "An exotic bright fruit, which is what glow berries are."
     },
     {
-      "names": ["Motes"],
+      "names": ["Mote", "Motes"],
       "item": "minecraft:amethyst_shard",
-      "why": "The Rift's violet currency, picked up as floating motes. The amethyst shard is the violet chip."
-    },
-    {
-      "names": ["Vermin"],
-      "item": "minecraft:silverfish_spawn_egg",
-      "why": "Vermin vacuumed out of the Rift's walls. The silverfish is vanilla's wall vermin."
+      "why": "The Rift currency. A small purple spark, so the amethyst shard. Singular, because that is how Hypixel names the item; the plural is kept for the counted form."
     },
     {
       "names": ["Enchanted Cobblestone"],
@@ -1662,10 +1526,10 @@
       "why": "SkyBlock's Enchanted <x> is 160 of the base item and is drawn as the base item with a shimmer, so that is what this is."
     },
     {
-      "names": ["Enchanted Slime Ball"],
+      "names": ["Enchanted Slimeball"],
       "item": "minecraft:slime_ball",
       "glint": true,
-      "why": "SkyBlock's Enchanted <x> is 160 of the base item and is drawn as the base item with a shimmer, so that is what this is."
+      "why": "Hypixel spells it \"Enchanted Slimeball\", one word."
     },
     {
       "names": ["Enchanted Blaze Rod"],
@@ -1752,10 +1616,10 @@
       "why": "SkyBlock's Enchanted <x> is 160 of the base item and is drawn as the base item with a shimmer, so that is what this is."
     },
     {
-      "names": ["Enchanted Cocoa Bean"],
+      "names": ["Enchanted Cocoa Beans"],
       "item": "minecraft:cocoa_beans",
       "glint": true,
-      "why": "SkyBlock's Enchanted <x> is 160 of the base item and is drawn as the base item with a shimmer, so that is what this is."
+      "why": "Hypixel spells it plural."
     },
     {
       "names": ["Enchanted Cactus Green"],
@@ -1781,7 +1645,6 @@
       "glint": true,
       "why": "SkyBlock's Enchanted <x> is 160 of the base item and is drawn as the base item with a shimmer, so that is what this is."
     },
-
     {
       "names": ["Null Sphere"],
       "item": "minecraft:ender_pearl",
@@ -1858,10 +1721,7 @@
       "why": "Same engraved-tablet family; the mourner sherd is the one with tears on it."
     },
     {
-      "names": [
-        "Wisp's Ice-Flavored Water", "Wisp's Ice-Flavored Water I",
-        "Wisp's Ice-Flavored Water I Splash Potion"
-      ],
+      "names": ["Wisp's Ice-Flavored Water I Splash Potion"],
       "item": "minecraft:splash_potion",
       "why": "It is a splash potion. The Blaze Catalyst in the same table is the cauldron, so nothing repeats."
     },
@@ -1914,6 +1774,378 @@
       "names": ["Scorched Power Crystal"],
       "item": "minecraft:end_crystal",
       "why": "A crystal that holds power. The end crystal is vanilla's power-holding crystal, and the Etherwarp Merger that shares it is a Voidgloom drop, never an Inferno one."
+    },
+    {
+      "names": ["Kuudra Key"],
+      "item": "minecraft:tripwire_hook",
+      "why": "A key. The tripwire hook is vanilla's hooked metal shape and reads as a key at 16x16; the trial key is already the Jungle Key."
+    },
+    {
+      "names": ["Hot Kuudra Key"],
+      "item": "minecraft:ominous_trial_key",
+      "why": "The same key, hotter: the ominous trial key is the orange-lit variant of the sprite the plain key family uses."
+    },
+    {
+      "names": ["Cyclamen Dye"],
+      "item": "minecraft:pink_dye",
+      "why": "Cyclamen is a pink flower; the pink dye is the pink one."
+    },
+    {
+      "names": ["Fire Veil Wand"],
+      "item": "minecraft:blaze_rod",
+      "why": "A fire wand. The blaze rod is vanilla's burning stick."
+    },
+    {
+      "names": ["Fire Freeze Staff"],
+      "item": "minecraft:snowball",
+      "why": "It freezes, and the snowball is the only vanilla sprite that reads as thrown cold at 16x16 without taking the ice the Glacite rows use."
+    },
+    {
+      "names": ["Ragnarock"],
+      "item": "minecraft:golden_axe",
+      "why": "A great axe. The golden axe is the only axe left after the diamond one went to the Scavenged Diamond Axe."
+    },
+    {
+      "names": ["Lumino Fiber"],
+      "item": "minecraft:glow_ink_sac",
+      "why": "Glowing fibre; the glow ink sac is vanilla's glowing loose material."
+    },
+    {
+      "names": ["Hallowed Skull"],
+      "item": "minecraft:skeleton_skull",
+      "why": "A skull. The wither skeleton skull is already the Master Skull family, so this takes the plain one."
+    },
+    {
+      "names": ["Arachne's Fang"],
+      "item": "minecraft:pointed_dripstone",
+      "why": "A fang: a long pale spike. Pointed dripstone is vanilla's spike."
+    },
+    {
+      "names": ["Arachne's Helmet"],
+      "item": "minecraft:iron_helmet",
+      "why": "Arachne's armour is a four-piece set, so it takes a whole vanilla armour family that nothing else in this table had claimed."
+    },
+    {
+      "names": ["Arachne's Chestplate"],
+      "item": "minecraft:iron_chestplate",
+      "why": "See Arachne's Helmet."
+    },
+    {
+      "names": ["Arachne's Leggings"],
+      "item": "minecraft:iron_leggings",
+      "why": "See Arachne's Helmet."
+    },
+    {
+      "names": ["Arachne's Boots"],
+      "item": "minecraft:iron_boots",
+      "why": "See Arachne's Helmet."
+    },
+    {
+      "names": ["Arachne Shard"],
+      "item": "minecraft:amethyst_shard",
+      "why": "An attribute shard, and the amethyst shard is the sprite this table already uses for a purple fragment."
+    },
+    {
+      "names": ["Luxurious Spool"],
+      "item": "minecraft:string",
+      "why": "A spool of thread; the vanilla string is thread."
+    },
+    {
+      "names": ["End Stone Geode"],
+      "item": "minecraft:amethyst_block",
+      "why": "A geode: crystals in a shell, which is exactly the vanilla amethyst block."
+    },
+    {
+      "names": ["Enchanted End Stone"],
+      "item": "minecraft:end_stone",
+      "glint": true,
+      "why": "End stone, glinted like every Enchanted <x>."
+    },
+    {
+      "names": ["Grand Experience Bottle"],
+      "item": "minecraft:experience_bottle",
+      "why": "It is an experience bottle."
+    },
+    {
+      "names": ["Titanic Experience Bottle"],
+      "item": "minecraft:dragon_breath",
+      "why": "The bigger one, and it cannot use the experience bottle the Grand bottle has: minecraft:experience_bottle carries enchantment_glint_override=true as a DEFAULT component on 26.1.2 and 26.2, so \"glint\": true on it changes nothing and the two bottles landed on one picture. Dragon breath is the nearest vanilla bottle that is visibly a different silhouette, and it is End-flavoured, which is where the Ender Node is."
+    },
+    {
+      "names": ["Shrimp the Fish"],
+      "item": "minecraft:tropical_fish",
+      "why": "One of the named fish, and the tropical fish is vanilla's only sprite that reads as a special fish rather than dinner."
+    },
+    {
+      "names": ["White Gift"],
+      "item": "minecraft:white_shulker_box",
+      "why": "The gifts are wrapped boxes and the shulker boxes are vanilla's only wrapped boxes, one per colour."
+    },
+    {
+      "names": ["Green Gift"],
+      "item": "minecraft:green_shulker_box",
+      "why": "See White Gift."
+    },
+    {
+      "names": ["Bobbin' Scriptures"],
+      "item": "minecraft:writable_book",
+      "why": "Scriptures, so a book; the written book is already Scorched Books."
+    },
+    {
+      "names": ["Iceberg Dye"],
+      "item": "minecraft:blue_dye",
+      "why": "Iceberg is deep blue."
+    },
+    {
+      "names": ["Aquamarine Dye"],
+      "item": "minecraft:cyan_dye",
+      "why": "Aquamarine is blue-green; the cyan dye is blue-green."
+    },
+    {
+      "names": ["Green Candy"],
+      "item": "minecraft:green_dye",
+      "why": "The Great Spook candies are flat coloured sweets with no vanilla counterpart at all; dye powder is the only 16x16 sprite that reads as a small thing of one colour, and the three candies need three colours that stay apart."
+    },
+    {
+      "names": ["Purple Candy"],
+      "item": "minecraft:purple_dye",
+      "why": "See Green Candy."
+    },
+    {
+      "names": ["Dark Candy"],
+      "item": "minecraft:black_dye",
+      "why": "See Green Candy."
+    },
+    {
+      "names": ["Divan's Alloy"],
+      "item": "minecraft:netherite_ingot",
+      "why": "An alloy ingot; the netherite ingot is vanilla's alloy."
+    },
+    {
+      "names": ["Quick Claw"],
+      "item": "minecraft:rabbit_foot",
+      "why": "A pet item that is a claw on a foot; the rabbit foot is the vanilla foot."
+    },
+    {
+      "names": ["Jaderald"],
+      "item": "minecraft:emerald",
+      "why": "A green gem. It shares the plain emerald with the Fine Jade Gemstone row, which is a different content area, and stays clear of the glinted emerald the Flawless jade takes on its own table."
+    },
+    {
+      "names": ["Glacite Jewel"],
+      "item": "minecraft:diamond",
+      "why": "A cut jewel. The plain diamond was free -- Enchanted Diamond is the glinted one."
+    },
+    {
+      "names": ["Bejeweled Handle"],
+      "item": "minecraft:golden_hoe",
+      "why": "A tool handle with a jewel in it; the golden hoe is the only vanilla haft left in this table."
+    },
+    {
+      "names": ["Frozen Scute"],
+      "item": "minecraft:armadillo_scute",
+      "why": "A scute. The turtle scute is already the Lava Shell, so this takes the armadillo one."
+    },
+    {
+      "names": ["Caged Wisp"],
+      "item": "minecraft:lantern",
+      "why": "A light in a cage, which is what a lantern is."
+    },
+    {
+      "names": ["Shattered Locket"],
+      "item": "minecraft:compass",
+      "why": "A small hinged metal disc worn on a chain; the compass is vanilla's only such object."
+    },
+    {
+      "names": ["Dwarven O's Metallic Minis"],
+      "item": "minecraft:gold_nugget",
+      "why": "Cereal made of tiny metal bits, which is what a pile of gold nuggets looks like."
+    },
+    {
+      "names": ["Nutcracker"],
+      "item": "minecraft:armor_stand",
+      "why": "A carved standing figure; the armour stand is vanilla's standing figure."
+    },
+    {
+      "names": ["Gift the Fish"],
+      "item": "minecraft:cod",
+      "why": "One of the named fish."
+    },
+    {
+      "names": ["Golden Gift"],
+      "item": "minecraft:yellow_shulker_box",
+      "why": "See White Gift; the gold one takes the yellow box."
+    },
+    {
+      "names": ["Winter Sack"],
+      "item": "minecraft:bundle",
+      "why": "A sack. The bundle is vanilla's sack."
+    },
+    {
+      "names": ["Krampus Helmet"],
+      "item": "minecraft:chainmail_helmet",
+      "why": "A dark horned helmet. It has to differ from the Snow Suit Helmet it shares the gift table with, so it takes chainmail rather than leather."
+    },
+    {
+      "names": ["Holly Dye"],
+      "item": "minecraft:red_dye",
+      "why": "Holly berries are red."
+    },
+    {
+      "names": ["Thunder Fragment"],
+      "item": "minecraft:lightning_rod",
+      "why": "Thunder, so the lightning rod."
+    },
+    {
+      "names": ["Silver Magmafish"],
+      "item": "minecraft:iron_nugget",
+      "why": "A small silver thing; the iron nugget is vanilla's small silver thing, and the magma cream is already the Magma Lord Fragment it shares a table with."
+    },
+    {
+      "names": ["Lord Jawbus Shard"],
+      "item": "minecraft:prismarine_shard",
+      "why": "A sea-creature attribute shard, and prismarine is vanilla's sea material."
+    },
+    {
+      "names": ["Emperor's Skull"],
+      "item": "minecraft:player_head",
+      "why": "A skull worn as a trophy; the player head is vanilla's worn head."
+    },
+    {
+      "names": ["Squid Boots"],
+      "item": "minecraft:leather_boots",
+      "why": "Soft boots. Leather is the soft vanilla boot, and the Snow Suit that also uses it is a different table."
+    },
+    {
+      "names": ["Carmine Dye"],
+      "item": "minecraft:brown_dye",
+      "why": "Carmine is a dark red-brown, and the plain red dye is already spoken for twice over."
+    },
+    {
+      "names": ["Hummingbird Shard"],
+      "item": "minecraft:parrot_spawn_egg",
+      "why": "A creature shard takes that creature's spawn egg; the parrot is vanilla's small bright bird."
+    },
+    {
+      "names": ["Phanpyre Shard"],
+      "item": "minecraft:bat_spawn_egg",
+      "why": "One of the three phantom-tree creatures; the bat is vanilla's night flier."
+    },
+    {
+      "names": ["Phanflare Shard"],
+      "item": "minecraft:blaze_spawn_egg",
+      "why": "The burning one of the three; the blaze is vanilla's burning flier."
+    },
+    {
+      "names": ["Beady Eyes"],
+      "item": "minecraft:spider_eye",
+      "why": "Eyes. The vanilla spider eye is an eye."
+    },
+    {
+      "names": ["Locust Larva"],
+      "item": "minecraft:wheat_seeds",
+      "why": "Pale grubs in a crop, which at 16x16 is what a scatter of seeds looks like."
+    },
+    {
+      "names": ["Wriggling Larva"],
+      "item": "minecraft:slime_ball",
+      "why": "A soft wriggling blob; the slime ball is the vanilla blob."
+    },
+    {
+      "names": ["Clipped Wings"],
+      "item": "minecraft:phantom_membrane",
+      "why": "A torn wing, which is what the phantom membrane is."
+    },
+    {
+      "names": ["Mantid Claw"],
+      "item": "minecraft:flint",
+      "why": "A hooked chip of something hard; the flint is the shape this table already uses for the Ancient Claw, on a different island."
+    },
+    {
+      "names": ["Fire in a Bottle"],
+      "item": "minecraft:fire_charge",
+      "why": "Contained fire, which is what the fire charge is."
+    },
+    {
+      "names": ["Squeaky Toy"],
+      "item": "minecraft:bell",
+      "why": "A thing that makes a noise when you hit it."
+    },
+    {
+      "names": ["Bookworm's Favorite Book"],
+      "item": "minecraft:book",
+      "why": "It is a book."
+    },
+    {
+      "names": ["Lucky Clover"],
+      "item": "minecraft:fern",
+      "why": "A small green leaf spray. The fern is vanilla's."
+    },
+    {
+      "names": ["Poignant Lucky Clover"],
+      "item": "minecraft:fern",
+      "glint": true,
+      "why": "The upgraded clover, glinted so it stays apart from the plain one it shares the visitor table with."
+    },
+    {
+      "names": ["Astronaut Minion Skin"],
+      "item": "minecraft:player_head",
+      "why": "A minion skin is a head, and the player head is the head."
+    },
+    {
+      "names": ["Wild Strawberry Dye"],
+      "item": "minecraft:pink_dye",
+      "why": "Wild strawberry is pink."
+    },
+    {
+      "names": ["Poppy"],
+      "item": "minecraft:poppy",
+      "why": "It is a poppy."
+    },
+    {
+      "names": ["Voter's Badge"],
+      "item": "minecraft:firework_star",
+      "why": "A small bright pinned disc; the firework star is the closest vanilla draws to a badge."
+    },
+    {
+      "names": ["Mango"],
+      "item": "minecraft:golden_apple",
+      "why": "The eight Carnival fruits are a real dig table the wiki lists, but none of the seven besides Dragonfruit exists in the NEU item database, so each borrows the closest vanilla fruit. The golden apple is vanilla's yellow-orange one."
+    },
+    {
+      "names": ["Coconut"],
+      "item": "minecraft:cocoa_beans",
+      "why": "A brown tropical pod; see Mango."
+    },
+    {
+      "names": ["Apple"],
+      "item": "minecraft:apple",
+      "why": "It is an apple."
+    },
+    {
+      "names": ["Cherry"],
+      "item": "minecraft:sweet_berries",
+      "why": "Small red fruit; see Mango."
+    },
+    {
+      "names": ["Pomegranate"],
+      "item": "minecraft:beetroot",
+      "why": "A dark red round fruit; see Mango."
+    },
+    {
+      "names": ["Durian"],
+      "item": "minecraft:cactus",
+      "why": "The spiky one; see Mango."
+    },
+    {
+      "names": ["Watermelon"],
+      "item": "minecraft:melon_slice",
+      "why": "It is a melon. The glinted melon slice is Enchanted Melon, so this takes the plain one."
+    },
+    {
+      "names": ["Wolf Tooth"],
+      "item": "minecraft:bone",
+      "why": "A tooth, so the bone -- and it is free on the Sven Packmaster table, where the other bone rows (Severed Hand, Skeleton Fish) do not appear. It went in when the published Sven table was corrected: the wiki lists Wolf Tooth, and lists no catalyst at all."
     }
   ]
 }

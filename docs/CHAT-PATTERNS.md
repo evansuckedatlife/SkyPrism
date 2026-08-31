@@ -1265,3 +1265,191 @@ so a copy would arm an object the machine never reads). **The intended fix** is 
 call `ScreenTitleFeed.bind(...)` where the machine is wired; `bind()` is checked before the
 reflection, so nothing else changes. Until then the field name is pinned by a test, so a rename
 fails a build rather than silently killing six sources in game.
+
+---
+
+## 12. Where the drop tables come from, added 2026-08-31
+
+Three things in this repository are lists of *SkyBlock item names*, and all three were
+originally assembled by a human reading wiki pages:
+
+| What | File | What a wrong name does |
+| --- | --- | --- |
+| The per-source jackpot lists | `core/loot/LootSourceRegistry.java` | that entry can never be matched, so the source never celebrates |
+| The item-art table | `assets/skyprism/drop_symbols.json` | that row is dead weight; the real drop falls to the chest fallback |
+| The shared filler names | `mc/hud/FillerStrip.GENERIC` | invented loot scrolls past on every reel |
+
+A reel strip *is* its source's jackpot list plus `GENERIC`, so a wrong jackpot name is not a
+quiet data defect — it is visible, spinning, in front of the player. That is exactly how this
+was reported: "the wrong drop tables are still being used."
+
+### 12.1 The failure mode, named
+
+**A fake item name fails exactly like a detector that never fires.** The gate opens, the line
+arrives, the parser reads it, the name is compared against a jackpot list holding a spelling
+Hypixel has never sent — no match, no flourish, no log line, nothing on screen. It is
+indistinguishable from standing somewhere the source cannot happen, which is the same silent
+failure §6 warns about for the patterns.
+
+So: **when a "source X never spins" report comes in, check the item names before touching the
+regex.** §6.3 is where to look first for a bad pattern; this section is where to look first for
+a bad name. The two are not distinguishable from outside the code, and the names have
+historically been the more wrong of the two.
+
+### 12.2 The canonical name source: the NotEnoughUpdates repo
+
+`NotEnoughUpdates-REPO` is the community's maintained SkyBlock item database — 8,755 item
+files, each carrying `internalname`, `displayname` (with `§` colour codes), `lore`, `itemid`
+and `nbttag`. It is what NEU, SkyHanni and most of the ecosystem resolve item names against,
+and it is the closest thing to a ground truth that exists off Hypixel's own servers.
+
+- **Upstream:** `https://github.com/NotEnoughUpdates/NotEnoughUpdates-REPO`, branch `master`,
+  directory `items/*.json`. Anyone can clone it; it is JSON and nothing else.
+- **On this machine, already on disk:**
+  `C:/Users/evanP/AppData/Roaming/ModrinthApp/profiles/SkyBlock Enhanced/config/notenoughupdates/repo`
+  — NEU keeps it current as part of the live game install. **Read only.** Never write into a
+  profile under `AppData/Roaming`.
+- **The useful sibling directory** is `constants/`: `bestiary.json` (island → mob roster),
+  `museum.json`, `attribute_shards.json`, `garden.json`, `essencecosts.json`.
+
+Two limits found the hard way, so nobody re-discovers them:
+
+- **`constants/bestiary.json` carries no drop tables.** It is `{island: {name, icon, mobs}}`
+  and stops there. `repo/mobs/*.json` is skin and render data, also no drops. NEU answers
+  *"is this a real item, and what is it called exactly"*. It does not answer *"what drops
+  it"*.
+- **NEU's `lore` often does answer "what drops it"**, and it is the cheapest signal available:
+  rune lore reads `Obtained rarely from slaying the Tarantula Broodfather` verbatim, and
+  `Requires Wolf Slayer 7` is what proved Hunter Ring and Hunter Talisman sit on the wrong
+  source. Grep the lore before reaching for the network.
+
+### 12.3 The content-area signal: Hypixel's own server resource pack
+
+Hypixel ships a server resource pack (`pack_format` 84, namespace `hypixel_skyblock`) with
+1,092 item-model definitions and 1,369 textures, and **its model paths are semantic** — they
+encode which content area an item belongs to:
+
+```
+assets/hypixel_skyblock/items/item/community_center/mayor/diana/daedalus_blade
+assets/hypixel_skyblock/items/item/island_relevant/mining_3/goblins/eggs/red_goblin_egg
+assets/hypixel_skyblock/items/item/slayer/blaze/pets_related/subzero_inverter
+```
+
+That is a genuine second, independent answer to the one question the drop tables kept getting
+wrong: *which source does this item belong to.* Hypixel's own art directory says there are
+four goblin eggs and they are red, blue, green and yellow, which is how "Golden Goblin Egg"
+and "Diamond Goblin Egg" were caught.
+
+- **How to get it:** join Hypixel with server resource packs enabled. Minecraft caches the zip
+  at `<instance>/downloads/<server-uuid>/<sha1>` with no file extension — on this machine, the
+  newest file under
+  `AppData/Roaming/ModrinthApp/profiles/SkyBlock Enhanced/downloads/242681e6-5e10-3cc8-8a64-451bdbf97e0b/`.
+  It is an ordinary zip; unzip it somewhere outside the profile and read
+  `assets/hypixel_skyblock/items/`.
+- **Its limit is coverage, not accuracy.** The pack only ships art Hypixel has re-textured,
+  329 of the 1,092 paths sit in `uncategorized`, and only 52 of the mod's 207 jackpot names
+  matched a path at all. **It can confirm a placement or refute one. It cannot enumerate a
+  drop table.** In particular, `community_center/mayor/diana/` holds only the six spade and
+  blade models, so the pack cannot police Diana's table.
+
+### 12.4 Why not the Fandom wiki
+
+`hypixel-skyblock.fandom.com` is the obvious source and **it does not work**:
+
+- `curl` with a browser user-agent → **HTTP 403**.
+- through a fetch proxy → **HTTP 402**.
+
+Fandom blocks automated access outright. Do not spend an hour re-confirming that.
+
+**`https://hypixelskyblock.minecraft.wiki` is not blocked, and it carries per-mob and
+per-chest drop tables with exact chances.** The catch is that it 403s `curl` and
+`Invoke-WebRequest` as well — it is reachable only through the agent `WebFetch` tool, which
+renders the page. 24 pages were pulled that way in one session with no failures. Paired with
+NEU lore, that is enough to rebuild any single table.
+
+The official `wiki.hypixel.net` shut down in July 2026 and must not be used (§11).
+
+### 12.5 How to re-verify one source's table
+
+1. **Name the source.** Find its entry in `LootSourceRegistry` and read its jackpot list.
+2. **Pull the drop table.** `WebFetch` the mob, chest or mechanic page on
+   `hypixelskyblock.minecraft.wiki`. Budget one page per source, plus one per sub-boss for the
+   grouped sources — `CRIMSON_MINIBOSS` needs Ashfang, Mage Outlaw, Bladesoul and Barbarian
+   Duke X.
+3. **Resolve every name against NEU.** Normalise the way the mod does (`TextClean.clean`, then
+   lower-case) and look the result up in the `displayname` index built from `items/*.json`. A
+   name resolving to nothing is fake. A name resolving to a *mob*, a *pet* or a *currency* is
+   not automatically fine — that is how `Lord Jawbus`, `Slug` and `El Dorado` got in.
+4. **Cross-check placement against the pack** wherever a path exists. A pack path under a
+   different content area than the source claims is a real conflict and needs a wiki ruling.
+   `Warty` is the open example: the pack files it under `island_relevant/foraging_2`, while
+   NEU's lore points at Nether Wart farming.
+5. **Give every new name a `drop_symbols.json` row**, keeping the per-source uniqueness rule in
+   §5.1: two drops from one event must not land on the same sprite.
+6. **Run the checks.** `DropSymbolsMcTest` for sprite collisions, plus the item-name check
+   below.
+
+### 12.6 The build-time name check
+
+The lesson of this bug is that a fake item name must not survive a green build. The check walks
+every name the mod ships — the `drop_symbols.json` keys, every jackpot list in
+`LootSourceRegistry`, `FillerStrip.GENERIC` — and **fails the build on a name that is not a
+real SkyBlock item**, matched against a snapshot of NEU display names checked into this
+repository so the test needs neither the network nor a game install.
+
+Two things to know about it:
+
+- **It is a spelling check, not a placement check.** It proves the item exists. It cannot prove
+  the item drops from that source — `Hunter Ring` is a perfectly real item that sat on the
+  wrong table for months. Placement is still steps 2 and 4 above, done by hand.
+- **The snapshot goes stale.** Regenerate it from a current NEU checkout when Hypixel adds
+  items. A name that vanishes upstream is not automatically a defect: `Bag of Cash` is a real
+  item, spelled right, that Hypixel removed from every drop table in May 2021 and that can
+  therefore never roll.
+
+If that check is not in your tree, it has not landed yet, and everything in this section is
+being enforced by hand.
+
+### 12.7 Sources that are still unverified
+
+Written down so the honest state lives on the page rather than in a chat log. The 2026-08-31
+audit resolved 373 of 476 name spellings to a real NEU item and left the rest below.
+
+**Empty jackpot list — these scroll only `GENERIC`, so they are honest rather than wrong**
+(20 sources): `SLAYER_MINIBOSS`, `DUNGEON_RUN_COMPLETE`, `ENDSTONE_PROTECTOR`, `VANQUISHER`,
+`BROODMOTHER`, `HEADLESS_HORSEMAN`, `RIFT_BOSS`, `COMBAT_SHARD`, `FOSSIL_EXCAVATION`,
+`EXPERIMENTS_REWARDS`, `SPOOKY_CHEST`, `FISHING_SEA_CREATURE`, `FISHING_TROPHY_FISH`,
+`GARDEN_CROP_FEVER`, `MINING_PRISTINE_GEMSTONE`, `MINING_COMPACT`, `YEAR_OF_THE_WITCH_STEW`,
+`RIFT_UBIK_SPLIT_OR_STEAL`, `RIFT_MOTES_ORB`, `RIFT_VERMIN_VACUUM`. `SPOOKY_CHEST` is the
+cheapest to fill — Ectoplasm plus the Trick or Treat Chest table — and `ENDSTONE_PROTECTOR`,
+`VANQUISHER`, `BROODMOTHER`, `HEADLESS_HORSEMAN` and `FOSSIL_EXCAVATION` each have a wiki page
+nobody has pulled yet.
+
+**Genuinely unknown. Do not guess a second time:**
+
+| Source | Why it is unknown |
+| --- | --- |
+| `CROESUS_CHEST` | The Croesus page does not enumerate contents and every Catacombs floor has its own table, so a correct list needs F1–F7 and M1–M7 data that neither NEU nor the pack carries. Its current list is two *chest tiers* — the container, not the loot. |
+| `DRACONIC_SACRIFICE` | The mechanic itself could not be established. Its two entries duplicate `ENDER_DRAGON`'s. |
+| `MOB_RARE_DROP` | "Rare Mob Drop" is a category, not a mob, so there is no table to verify against. All five entries are borrowed from named sources; it probably should not carry a jackpot list at all. |
+| `LOOT_CHEST` | Undefined scope. Its list is the first five entries of `POWDER_CHEST` copied verbatim, so two sources scroll identical reels. It needs a definition before it can be given a table. |
+| `POWDER_CHEST` | Believed correct — all 18 entries resolve and NEU lore backs each one — but the Crystal Hollows Treasure Chest wiki page 404s, so no drop table confirmed it. |
+| `WINTER_GIFT` | Only the Snow Suit pieces are confirmed. The authoritative per-gift-tier list was not found. |
+| `CARNIVAL_FRUIT_DIGGING` | The wiki confirms eight fruits — Dragonfruit, Mango, Coconut, Apple, Cherry, Pomegranate, Durian, Watermelon — and **none of the eight exists in NEU or in the pack**, so no sprite can be resolved from either local source. |
+| One-entry lists | `GLACITE_MINESHAFT_PORTAL`, `SUSPICIOUS_SCRAP`, `YEAR_OF_THE_PIG_ORB`, `GARDEN_VERY_RARE_CROP` — each single entry is real, but a one-entry list cannot be checked for completeness. |
+
+**Two intentional non-items, recorded so a later reader does not "fix" them into items.**
+`GLACITE_MINESHAFT_PORTAL` pays `Glacite Mineshaft`, a location, because the payout genuinely
+is *you found a mineshaft*. And `Coins` is a legitimate Diana jackpot outcome because Hypixel
+prints `You dug out 2,500 coins` verbatim.
+
+**Diana is clean.** All 18 `DIANA_MYTHOLOGICAL` jackpot names were checked against the
+Mythological Ritual table and are correct in substance. The one open question there is
+rendering, not naming: `Chimera` is an *enchantment*, so the drop Hypixel prints is
+`Enchanted Book (Chimera I)` and the sprite belongs on a glinted book. Diana's 260 core tests
+must keep passing unmodified.
+
+**A caveat covering every table on this page.** Several fishing tables pulled during the audit
+clearly post-date the mod's data — Sea Lumies, Mangcore, Bobbin' Scriptures, Emperor's Skull
+and Thunder Fragment are all absent from the mod. A table verified once is verified as of that
+date and no later.

@@ -349,6 +349,22 @@ recognised drop) and by tests. The `diana.jackpotItems` config list is read by
 its printed output. If the intent is "flourish only for the configured items", that wiring
 does not exist yet.
 
+### The drop tables
+
+What a reel *shows* is data, not code: the per-source jackpot lists in
+`core/loot/LootSourceRegistry`, the shared filler names in `mc/hud/FillerStrip.GENERIC`, and
+the name → vanilla-sprite rows in `assets/skyprism/drop_symbols.json`. A strip is its source's
+jackpot list plus `GENERIC`, so those three files are the only thing standing between a player
+and loot that does not exist. They were originally assembled by reading wiki pages and were
+wrong in ways a SkyBlock player spots on sight. **They are now sourced from the
+NotEnoughUpdates item repo for names and from Hypixel's own server resource pack for which
+content area an item belongs to; Fandom is blocked and cannot be used.** A fake name is not a
+loud failure — it simply never matches, so the source stays silent exactly as if its detector
+had never fired. Provenance, the re-verification procedure, the build-time name check and the
+list of tables still unverified are in
+[CHAT-PATTERNS.md §12](CHAT-PATTERNS.md#12-where-the-drop-tables-come-from-added-2026-08-31);
+the sprite-collision rule is §5.1 of the same file. Do not edit these lists from memory.
+
 ### Two doors into the chat feed, one path through
 
 Both `DianaController.init()` and `ChatHooks.register()` register an `ALLOW_GAME` listener,

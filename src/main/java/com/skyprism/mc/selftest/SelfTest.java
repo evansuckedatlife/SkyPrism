@@ -218,13 +218,28 @@ public final class SelfTest {
     private static final List<LootDrop> CHEST_DROPS = List.of(
             new LootDrop("Necron's Handle", "6", 1, true),
             new LootDrop("Wither Catalyst", "5", 1, false),
-            new LootDrop("Essence", "d", 32, false));
+            // "Wither Essence" rather than the bare "Essence" the fixture used to carry: essence
+            // ships in eight typed variants and Hypixel always names the type, so the generic word
+            // was a drop nobody can receive and lost its sprite row with the rest of the fakes.
+            new LootDrop("Wither Essence", "d", 32, false));
 
-    /** A Lord Jawbus kill, which is where Rare Drop banners on the water come from. */
+    /**
+     * A Lord Jawbus kill, which is where Rare Drop banners on the water come from.
+     *
+     * <p>Every name here is off the published Lord Jawbus table, and the rarity colour of each is
+     * the one NEU records, so the frame is a photograph of a payout a player can actually receive:
+     * Silver Magmafish 16-32x and one Magma Lord Fragment are the guaranteed pair, and the
+     * Radioactive Vial is the 0.5% roll that raises the banner.
+     *
+     * <p>It did not used to be. The fixture paid a Lava Shell and a Magma Urchin, neither of which
+     * is on Jawbus's table at all -- the urchin is Crimson Isle miniboss loot -- so the published
+     * fishing screenshot showed two items from the wrong content beside one that was right. That
+     * is the exact complaint this pass exists to answer, and it was in the README.</p>
+     */
     private static final List<LootDrop> FISHING_DROPS = List.of(
-            new LootDrop("Radioactive Vial", "5", 1, true),
-            new LootDrop("Lava Shell", "9", 3, false),
-            new LootDrop("Magma Urchin", "a", 5, false));
+            new LootDrop("Radioactive Vial", "d", 1, true),
+            new LootDrop("Magma Lord Fragment", "6", 1, false),
+            new LootDrop("Silver Magmafish", "5", 24, false));
 
     /**
      * The five demonstration reels, keyed by the frame each one is captured into.

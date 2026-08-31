@@ -231,12 +231,18 @@ final class SlotMachineFillerMcTest {
                 () -> "a fishing reel is scrolling a Diana drop: " + fishing);
         assertFalse(slayer.contains("Griffin Feather"),
                 () -> "a slayer reel is scrolling a Diana drop: " + slayer);
-        assertFalse(diana.contains("Lord Jawbus"),
-                () -> "a Diana reel is scrolling a sea creature: " + diana);
+        assertFalse(diana.contains("Lord Jawbus Shard"),
+                () -> "a Diana reel is scrolling sea creature loot: " + diana);
+        // "Lord Jawbus" itself is no longer on any strip and must not come back: it is the
+        // CREATURE, and a reel that names the thing you killed instead of the thing it dropped is
+        // the same mistake as an invented item.
+        assertFalse(fishing.contains("Lord Jawbus"),
+                () -> "the fishing strip is scrolling a sea creature rather than its loot: "
+                        + fishing);
 
         assertTrue(diana.contains("Minos Relic"), () -> "Diana's own loot is missing: " + diana);
-        assertTrue(fishing.contains("Lord Jawbus"),
-                () -> "the rare sea creature strip has no sea creature on it: " + fishing);
+        assertTrue(fishing.contains("Lord Jawbus Shard"),
+                () -> "the rare sea creature strip has no sea creature loot on it: " + fishing);
         assertTrue(slayer.contains("Judgement Core"),
                 () -> "the slayer strip has no slayer drop on it: " + slayer);
     }

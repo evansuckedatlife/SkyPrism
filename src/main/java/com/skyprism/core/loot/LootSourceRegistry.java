@@ -112,7 +112,7 @@ public final class LootSourceRegistry {
                                 "Braided Griffin Feather", "Daedalus Stick", "Crochet Tiger Plushie",
                                 "Shimmering Wool", "Manti-core", "Washed-up Souvenir", "Cretan Urn",
                                 "Hilt of Revelations", "Brain Food", "Antique Remedies",
-                                "Dwarf Turtle Shelmet", "Fateful Stinger", "Chimera I", "Chimera",
+                                "Dwarf Turtle Shelmet", "Fateful Stinger", "Chimera I",
                                 "Crown of Greed")
                         .note("The shipped path and the only one verified on the live server. The roll "
                                 + "fires on the bound creature being defeated, which is an entity "
@@ -137,7 +137,8 @@ public final class LootSourceRegistry {
                                 "Shredded Sinew", "Severed Hand", "Beheaded Horror", "Snake Rune I",
                                 "Wilson's Engineering Plans", "Subzero Inverter",
                                 "High Class Archfiend Dice", "Fiery Burst Rune I", "Byzantium Dye",
-                                "Matcha Dye", "Brick Red Dye", "Celeste Dye", "Flame Dye")
+                                "Matcha Dye", "Brick Red Dye", "Celeste Dye", "Flame Dye",
+                                "Hazmat Enderman")
                         .note("The closest analogue to the shipped Diana behaviour: a deliberate, "
                                 + "discrete kill the player is waiting on, at Diana's own cadence. "
                                 + "ON_RARE_BANNER would gut it, because the whole point of a slayer "
@@ -172,9 +173,21 @@ public final class LootSourceRegistry {
                                 "§6§lRARE DROP! §r§9Judgement Core §r§b(+§r§b168% §r§b✯ Magic Find§r§b)",
                                 "§b§lRARE DROP! §r§7(§r§f§r§9Revenant Viscera§r§7) (+123% ✯ Magic Find)",
                                 "§5§lVERY RARE DROP!  §r§7(§r§f§r§5Revenant Catalyst§r§7) (+123% ✯ Magic Find)")
-                        .jackpot("Summoning Eye", "Judgement Core", "Sorrow", "Hazmat Enderman",
-                                "Pocket Espresso Machine")
-                        .note("The catch-all that makes the feature SkyBlock-wide without a detector "
+                        .jackpot("Summoning Eye")
+                        .note("\"Rare Mob Drop\" is a category, not a mob, so there is no drop table "
+                                + "to transcribe and this list can only ever be the drops that "
+                                + "belong to no named source. Judgement Core, Sorrow and the Pocket "
+                                + "Espresso Machine were on it and are gone: they are Voidgloom and "
+                                + "Mist loot, already listed on the sources that really pay them, so "
+                                + "a third home here made the reel claim they can come off anything. "
+                                + "The Hazmat Enderman went the same way and for the same reason, "
+                                + "one pass later: the wiki puts it on the Voidgloom Seraph at 1.04% "
+                                + "on tier III and 1.55% on tier IV, so it is slayer loot with a "
+                                + "source of its own and it now sits on SLAYER_BOSS. What is left is "
+                                + "the Summoning Eye, which Zealots drop in the End under a rare "
+                                + "banner and which no other source here claims. Short and true "
+                                + "beats long and invented. "
+                                + "The catch-all that makes the feature SkyBlock-wide without a detector "
                                 + "per mob. Deliberately always-on, which is affordable only because "
                                 + "it is one regex behind a single indexOf of \"DROP!\" -- that one "
                                 + "test is the entire per-line cost on the chat that is not a drop. "
@@ -273,11 +286,18 @@ public final class LootSourceRegistry {
                         .samples(
                                 "§f                      §r§6§lASHFANG DOWN!",
                                 "§f                      §r§6§lBARBARIAN DUKE X DOWN!")
-                        .jackpot("Ashfang Helmet", "Ashfang Gloves", "Ashfang Cloak",
-                                "Soul Esperance", "Mageblood Necklace", "Fel Pearl")
-                        .note("A two-minute respawn floor means the worst case is a roll every two "
+                        .jackpot("Magma Urchin", "Kuudra Key", "Hot Kuudra Key", "Cyclamen Dye",
+                                "Fire Veil Wand", "Fire Freeze Staff", "Ragnarock", "Lumino Fiber",
+                                "Hallowed Skull")
+                        .note("Every name here was replaced. The old list was six drops of which "
+                                + "five did not exist -- there is no Ashfang armour set at all, no "
+                                + "Soul Esperance and no Mageblood Necklace anywhere in SkyBlock -- "
+                                + "and the sixth, Fel Pearl, is Catacombs loot. This list is the "
+                                + "shared miniboss pool plus the per-boss drops across Ashfang, Mage "
+                                + "Outlaw, Bladesoul and Barbarian Duke X. "
+                                + "A two-minute respawn floor means the worst case is a roll every two "
                                 + "minutes, and only while camping one spawn -- well inside Diana's "
-                                + "cadence. The five names are a closed set, which is what keeps the "
+                                + "cadence. The names are a closed set, which is what keeps the "
                                 + "anchored match safe: never accept an arbitrary name out of a "
                                 + "DOWN! banner, or a party message becomes a remote control for "
                                 + "someone else's HUD.")
@@ -305,10 +325,17 @@ public final class LootSourceRegistry {
                         .rareBanner()
                         .markers("ARACHNE DOWN!")
                         .samples("§f                              §r§6§lARACHNE DOWN!")
-                        .jackpot("Arachne's Calling", "Arachne's Keeper Fragment",
-                                "Travel Scroll to Spider's Den Top of Nest", "Bite Rune I")
+                        .jackpot("Arachne Fragment", "Arachne's Fang", "Arachne's Helmet",
+                                "Arachne's Chestplate", "Arachne's Leggings", "Arachne's Boots",
+                                "Arachne Shard", "Luxurious Spool", "Dark Queen's Soul")
                         .note("Needs crystals to summon and the fight is communal and infrequent: an "
-                                + "unambiguous event.")
+                                + "unambiguous event. All four old names were wrong, and two of them "
+                                + "were the same object twice: \"Arachne's Calling\" is the display "
+                                + "name of ARACHNE_KEEPER_FRAGMENT, which the list also carried under "
+                                + "its internal name -- and it is the summoning item her Keepers drop, "
+                                + "not something she pays. The travel scroll is rank-gated fast travel "
+                                + "and Bite Rune is Tarantula Broodfather loot, which the NEU lore "
+                                + "says out loud. This list is her own table.")
                         .build(),
 
                 LootSourceInfo.builder(LootSource.BROODMOTHER, "Broodmother")
@@ -332,12 +359,17 @@ public final class LootSourceRegistry {
                         .samples(
                                 "RARE DROP! Sorrow (+123% ✯ Magic Find)",
                                 "The ghost's death materialized 1,000,000 coins from the mists!")
-                        .jackpot("Sorrow", "Bag of Cash", "Ghost Cutlass", "Plasma", "Volta",
-                                "Ectoplasm")
+                        .jackpot("Sorrow", "Plasma", "Volta", "Ghostly Boots")
                         .note("Ghosts die every few seconds in a real grind, so ALWAYS is out; the "
-                                + "banner is already the correct rarity filter. Model the Bag of Cash "
-                                + "line the way Diana's coin payout is modelled -- an item named "
-                                + "Coins with a count -- and give it the flourish.")
+                                + "banner is already the correct rarity filter. Three names left this "
+                                + "list. There is no \"Ghost Cutlass\" -- the Ghost's rare armour drop "
+                                + "is Ghostly Boots. Ectoplasm is Spooky Festival loot and now sits on "
+                                + "SPOOKY_CHEST, which owns it. And the Bag of Cash was removed from "
+                                + "the Ghost table by Hypixel on 2021-05-17: Ghosts pay the million "
+                                + "coins directly now, so a jackpot entry for it could never fire, "
+                                + "which is the same failure as an invented name. The coin payout is "
+                                + "still modelled the way Diana's is, as an item named Coins with a "
+                                + "count.")
                         .build(),
 
                 LootSourceInfo.builder(LootSource.DRACONIC_SACRIFICE, "Draconic Sacrifice")
@@ -345,8 +377,13 @@ public final class LootSourceRegistry {
                         .gate(SourceGate.island("The End"))
                         .markers("BONUS LOOT!")
                         .samples("§c§lBONUS LOOT! §r§eYou also received §r§817x §r§5Wise Dragon Fragment §r§efrom your sacrifice!")
-                        .jackpot("Superior Dragon Fragment", "Ender Dragon")
-                        .note("Trigger on BONUS LOOT, never on SACRIFICE. Mass-sacrificing a stash "
+                        .jackpot("Superior Dragon Fragment")
+                        .note("The bonus a sacrifice pays is more dragon fragments, which is what the "
+                                + "sample line says and all this list now claims. The Ender Dragon pet "
+                                + "was on it, copied across from ENDER_DRAGON; a sacrifice does not "
+                                + "pay a pet, and one entry that is true is worth more than two where "
+                                + "one is borrowed. "
+                                + "Trigger on BONUS LOOT, never on SACRIFICE. Mass-sacrificing a stash "
                                 + "emits dozens of SACRIFICE lines in seconds; the bonus IS the "
                                 + "chance, so firing solely on it gives an already-correct rate with "
                                 + "no policy machinery at all. This is the general template: pick "
@@ -358,12 +395,16 @@ public final class LootSourceRegistry {
                         .gate(SourceGate.island("The End"))
                         .markers("ENDER NODE!")
                         .samples("§5§lENDER NODE! §r§fYou found §r§8§r§aEnchanted Obsidian§r§f!")
-                        .jackpot("Ender Gauntlet", "Ender Helmet", "Ender Chestplate",
-                                "Ender Leggings", "Ender Boots", "End Stone Shulker")
-                        .note("Node mining prints this line constantly and the overwhelming majority "
-                                + "are Enchanted Obsidian or Ender Pearls; only the Ender armour is "
-                                + "worth a spin. Mining-shaped content on a combat island, so it has "
-                                + "exactly one owner.")
+                        .jackpot("Ender Gauntlet", "End Stone Shulker", "End Stone Geode",
+                                "Enchanted End Stone", "Enchanted Ender Pearl",
+                                "Grand Experience Bottle", "Titanic Experience Bottle",
+                                "Shrimp the Fish")
+                        .note("Node mining prints this line constantly and most of it is dust; this "
+                                + "is the node's own table. The four Ender Armor pieces used to be "
+                                + "four of the six entries and are crafted, never node loot -- a node "
+                                + "has never dropped one, so four sixths of the reel was showing a "
+                                + "player armour they would have to make themselves. Mining-shaped "
+                                + "content on a combat island, so it has exactly one owner.")
                         .build(),
 
                 LootSourceInfo.builder(LootSource.REINDRAKE, "Reindrake")
@@ -373,10 +414,16 @@ public final class LootSourceRegistry {
                         .markers("from the depths!", "DROP!")
                         .samples(
                                 "WOAH! [VIP] Georeek summoned a Reindrake from the depths!",
-                                "§6§lRARE DROP! §r§9Reindrake Fragment §r§b(+123% ✯ Magic Find)")
-                        .jackpot("Reindrake Fragment", "Frozen Blaze Helmet")
-                        .note("The only verified line is a lobby-wide summon broadcast that fires "
-                                + "whether or not you participate, so triggering on it would spin "
+                                "§6§lRARE DROP! §r§9Bobbin' Scriptures §r§b(+123% ✯ Magic Find)")
+                        .jackpot("White Gift", "Green Gift", "Red Gift", "Bobbin' Scriptures",
+                                "Iceberg Dye", "Aquamarine Dye")
+                        .note("Both old entries were wrong and one of them was not an item: there is "
+                                + "no \"Reindrake Fragment\" -- only the sea creature itself -- and "
+                                + "the Frozen Blaze set is not on its table. The sample line named "
+                                + "the same non-existent fragment and was corrected with it. This "
+                                + "list is the Reindrake's own drops. "
+                                + "The only verified trigger line is a lobby-wide summon broadcast that "
+                                + "fires whether or not you participate, so triggering on it would spin "
                                 + "the widget for bystanders. The drop banner carries it until a "
                                 + "kill line is verified.")
                         .build(),
@@ -388,9 +435,13 @@ public final class LootSourceRegistry {
                         .markers("Primal Fear", "DROP!")
                         .samples(
                                 "§5§lFEAR. §r§eA §r§dPrimal Fear §r§ehas been summoned!",
-                                "§6§lRARE DROP! §r§9Ephemeral Gratitude §r§b(+123% ✯ Magic Find)")
-                        .jackpot("Ephemeral Gratitude", "Bone Dye")
-                        .note("The summon line is verified; the defeat line is not, and the summon "
+                                "§6§lRARE DROP! §r§9Green Candy §r§b(+123% ✯ Magic Find)")
+                        .jackpot("Green Candy", "Purple Candy", "Dark Candy")
+                        .note("A Primal Fear pays candy and nothing else -- one to two Green, up to "
+                                + "one Purple, one Dark. Neither of the two names that used to be "
+                                + "here is on its table, and the sample line named one of them, so "
+                                + "that was corrected too. "
+                                + "The summon line is verified; the defeat line is not, and the summon "
                                 + "fires for other people's fears too. Banner-gating is the honest "
                                 + "default. Gated on the Great Spook, so it is shut for eleven "
                                 + "months of the year.")
@@ -429,10 +480,17 @@ public final class LootSourceRegistry {
                         .markers("Return to the Trapper soon", "DROP!")
                         .samples(
                                 "Return to the Trapper soon to get a new animal to hunt!",
-                                "§6§lRARE DROP! §r§9Hunter Ring §r§b(+123% ✯ Magic Find)")
-                        .jackpot("Hunter Ring", "Hunter Talisman", "Hunter Knife",
-                                "Skin of the Wolf", "Trapper's Ring")
-                        .note("A hunt completes every one to three minutes and the reward is usually "
+                                "§6§lRARE DROP! §r§9Hunter Knife §r§b(+123% ✯ Magic Find)")
+                        .jackpot("Hunter Knife")
+                        .note("One entry, because one entry is all that is true. Trevor pays Pelts, "
+                                + "coins and Hunting XP; the Hunter Knife is the only item on his "
+                                + "table. Of the four names removed, two do not exist at all (\"Skin "
+                                + "of the Wolf\", \"Trapper's Ring\" -- the real accessory is the "
+                                + "Trapper Crest) and two are Sven Packmaster loot: NEU's own lore on "
+                                + "the Hunter Ring and Hunter Talisman says \"Requires Wolf Slayer "
+                                + "7\". The sample line named one of them and was corrected. The "
+                                + "strip tops up from the generic pool, which claims nothing. "
+                                + "A hunt completes every one to three minutes and the reward is usually "
                                 + "mundane; the rarity tier is what matters and the banner encodes "
                                 + "it. Narrowing the detector to Endangered and Elusive assignments "
                                 + "would make ALWAYS defensible, since the rarity is in the "
@@ -486,9 +544,11 @@ public final class LootSourceRegistry {
                         .rareBanner()
                         .markers("RARE REWARD!")
                         .samples("§6§lRARE REWARD! §r§bLeebys §r§efound a §r§6Kraken Shard §r§ein their Paid Chest§r§e!")
-                        .jackpot("Kraken Shard", "Apex Dragon Shard", "Heavy Pearl",
-                                "Infernal Kuudra Core")
-                        .note("A fast T5 team takes two chests per run at twenty to thirty an hour, "
+                        .jackpot("Kraken Shard", "Heavy Pearl", "Infernal Kuudra Core")
+                        .note("The Apex Dragon Shard was removed: it is ATTRIBUTE_SHARD_VETERAN, a "
+                                + "hunting shard off the Apex Dragon in the End, and has never been "
+                                + "in a Kuudra chest. The other three are verified. "
+                                + "A fast T5 team takes two chests per run at twenty to thirty an hour, "
                                 + "squarely in the maddening range for ALWAYS. Flagged uncertainty: "
                                 + "the RARE REWARD broadcast is only confirmed for an Obsidian "
                                 + "Chest, and its pattern would match \"Paid\" but has not been seen "
@@ -505,13 +565,22 @@ public final class LootSourceRegistry {
                         .rareBanner()
                         .markers("RARE REWARD!")
                         .samples("§6§lRARE REWARD! §r§bLeebys §r§efound a §r§6Necron's Handle §r§ein their Bedrock Chest§r§e!")
-                        .jackpot("Obsidian Chest", "Bedrock Chest")
-                        .note("Deliberately a separate source from DUNGEON_REWARD_CHEST even though "
+                        .note("No jackpot list, and that is the honest answer rather than a gap. It "
+                                + "used to hold \"Obsidian Chest\" and \"Bedrock Chest\", which are "
+                                + "the two top chest TIERS a player buys, not loot -- so the reel "
+                                + "announced a container instead of what was in it. A correct list "
+                                + "needs the per-floor Catacombs tables, F1-F7 and M1-M7, which "
+                                + "neither the NEU repository nor Hypixel's own resource pack "
+                                + "carries and which no single wiki page enumerates. Until someone "
+                                + "transcribes them, the strip tops up from the generic pool, which "
+                                + "says nothing false; DUNGEON_REWARD_CHEST already carries the "
+                                + "Necron-tier contents that are verified. "
+                                + "Deliberately a separate source from DUNGEON_REWARD_CHEST even though "
                                 + "the per-chest GUI is identical: clearing a backlog at Croesus "
                                 + "opens fifteen chests in ninety seconds, which is a completely "
                                 + "different pacing problem from one at the end of a run, and the "
                                 + "player needs to silence that session without silencing in-run "
-                                + "chests. The tier itself is the lottery here.")
+                                + "chests.")
                         .build(),
 
                 LootSourceInfo.builder(LootSource.POWDER_CHEST, "Crystal Hollows Treasure Chest")
@@ -540,9 +609,16 @@ public final class LootSourceRegistry {
                         .gate(SourceGate.islands("Crystal Hollows", "Mineshaft"))
                         .markers("LOOT CHEST COLLECTED")
                         .samples("  §r§5§lLOOT CHEST COLLECTED")
-                        .jackpot("Pickonimbus 2000", "Jungle Heart", "Prehistoric Egg",
-                                "Red Goblin Egg", "Blue Goblin Egg")
-                        .note("Five to ten an hour, each a deliberate detour to a named structure "
+                        .note("No jackpot list on purpose. The five it used to carry were the first "
+                                + "five entries of POWDER_CHEST copied verbatim, so the Crystal "
+                                + "Hollows pool was scrolling under a caption that covers every "
+                                + "structure chest in two islands and two of the sources drew "
+                                + "identical reels. \"Structure Loot Chest\" has no single table -- "
+                                + "the Jungle Temple, the Mineshaft chests and the Crystal Hollows "
+                                + "chests are three different pools -- so it needs a definition "
+                                + "before it can have a list, and until it has one the strip tops up "
+                                + "from the generic pool. "
+                                + "Five to ten an hour, each a deliberate detour to a named structure "
                                 + "with a fat loot table: the pacing the machine was built for. The "
                                 + "area name captions it for free. A player key-spamming the Jungle "
                                 + "Temple, which refills on every key, will want "
@@ -556,13 +632,16 @@ public final class LootSourceRegistry {
                         .samples(
                                 "§7Pick it up near the §r§5Nucleus Vault§r§7!",
                                 "§f    §r§5§l✦ CRYSTAL FOUND §r§7(1§r§7/5§r§7)")
-                        .jackpot("Jade Crystal", "Amethyst Crystal", "Amber Crystal",
-                                "Sapphire Crystal", "Topaz Crystal")
+                        .jackpot("Divan's Alloy", "Quick Claw", "Jaderald", "Helix Fossil",
+                                "Flawless Jade Gemstone", "Flawless Amber Gemstone")
                         .note("A full run is thirty to sixty minutes and happens at most twice an "
                                 + "hour; nothing in the game deserves the machine more. Roll on the "
                                 + "completion only -- the five CRYSTAL FOUND lines are progress "
-                                + "markers, and firing on each would devalue the finish. Use the "
-                                + "five crystals as the reel symbols.")
+                                + "markers, and firing on each would devalue the finish. The five "
+                                + "crystals used to BE the list, which had it exactly backwards: "
+                                + "they are what you collect around the Hollows and deposit at the "
+                                + "statues to enable a run, i.e. the entry fee, not the payout. "
+                                + "These are the run's rewards.")
                         .build(),
 
                 LootSourceInfo.builder(LootSource.METAL_DETECTOR_SCAVENGE, "Metal Detector Find")
@@ -586,10 +665,15 @@ public final class LootSourceRegistry {
                         .gate(SourceGate.island("Mineshaft"))
                         .markers("CORPSE LOOT!")
                         .samples("  §r§b§l§r§9§lLAPIS §r§b§lCORPSE LOOT!")
-                        .jackpot("Ascension Rope", "Fine Onyx Gemstone", "Flawless Onyx Gemstone",
-                                "Pickonimbus 2000", "Vanguard Helmet", "Armor of Yog Helmet",
-                                "Mineral Helmet", "Lapis Armor Helmet")
-                        .note("Structurally identical to a Diana burrow: a key-gated, deliberate, "
+                        .jackpot("Fine Onyx Gemstone", "Flawless Onyx Gemstone", "Glacite Jewel",
+                                "Bejeweled Handle", "Frozen Scute", "Caged Wisp",
+                                "Shattered Locket", "Dwarven O's Metallic Minis")
+                        .note("Six of the eight old entries were not corpse loot: there is no "
+                                + "Vanguard armour at all (SKYBLOCK_CORPSE_VANGUARD is the corpse "
+                                + "itself), and the Yog, Mineral and Lapis helmets, the Ascension "
+                                + "Rope and the Pickonimbus are mined or crafted elsewhere. Only the "
+                                + "two Onyx gemstones survived. This is the real frozen-corpse table. "
+                                + "Structurally identical to a Diana burrow: a key-gated, deliberate, "
                                 + "discrete opening with a randomised payout, minutes apart. The "
                                 + "header names the corpse type, which is the caption. The four "
                                 + "types differ enormously in stakes -- Lapis is free, Vanguard "
@@ -663,9 +747,15 @@ public final class LootSourceRegistry {
                         .samples(
                                 "§e§lSWEET! §r§5Snow Suit Helmet §r§egift with §r§aGrazma§r§e!",
                                 "§9§lRARE! §r§6+20,000 Coins §r§egift with §r§aGrazma§r§e!")
-                        .jackpot("Cryopowder Shard", "Snow Suit Helmet", "Snow Suit Chestplate",
-                                "Snow Suit Leggings", "Snow Suit Boots", "North Star")
-                        .note("The best-behaved source found anywhere: Hypixel prints the rarity word "
+                        .jackpot("Snow Suit Helmet", "Snow Suit Chestplate", "Snow Suit Leggings",
+                                "Snow Suit Boots", "Nutcracker", "Gift the Fish", "Golden Gift",
+                                "Winter Sack", "Krampus Helmet", "Holly Dye")
+                        .note("Two entries left and six joined. The North Star is Season of Jerry shop "
+                                + "CURRENCY, not gift contents, and Fragmented Cryopowder (which the "
+                                + "list spelled \"Cryopowder Shard\", its internal name) upgrades "
+                                + "Frosty the Snow Blaster and is not on the verified gift table "
+                                + "either. The Snow Suit pieces were always right. "
+                                + "The best-behaved source found anywhere: Hypixel prints the rarity word "
                                 + "itself, so the policy maps onto SWEET, SANTA TIER and PARTY TIER "
                                 + "with no item list at all and nothing that can drift when the loot "
                                 + "table changes. COMMON is the overwhelming majority of a gifting "
@@ -693,7 +783,14 @@ public final class LootSourceRegistry {
                         .gate(SourceGate.season("the Spooky Festival"))
                         .markers("has appeared!")
                         .samples("§6§lSPOOKY! §r§7A §r§6Trick or Treat Chest §r§7has appeared!")
-                        .note("Shipped disabled and it should stay that way until someone captures a "
+                        .jackpot("Ectoplasm")
+                        .note("One entry, and it is the one the chest is actually known to pay: "
+                                + "Ectoplasm is 11.46% of a Trick or Treat Chest. It used to sit on "
+                                + "GHOST_MIST, which is Dwarven Mines content and a different season "
+                                + "entirely; this source owns it. The rest of the chest's table has "
+                                + "not been transcribed, so the strip tops up from the generic pool "
+                                + "rather than guessing the remaining 88%. "
+                                + "Shipped disabled and it should stay that way until someone captures a "
                                 + "loot line live. The appearance broadcast says a chest spawned "
                                 + "somewhere on the island -- not that you opened one, not what was "
                                 + "in it, possibly opened by someone else. Rolling on it would be a "
@@ -712,10 +809,17 @@ public final class LootSourceRegistry {
                                 "§9The sky darkens and the air thickens. The end times are upon us: Ragnarok is here.",
                                 "§9What is this creature!?",
                                 "§9You hear a massive rumble as Thunder emerges.")
-                        .jackpot("Titanoboa Shed", "Radioactive Vial", "Lord Jawbus", "Thunder",
-                                "Flying Fish", "Magma Lord Fragment", "Reindrake Fragment",
-                                "Plhlegblast Pearl", "Shark Tooth Necklace", "Sea Emperor Fragment")
-                        .note("The fishing analogue of a Minos Inquisitor: the corpus already did the "
+                        .jackpot("Titanoboa Shed", "Radioactive Vial", "Magma Lord Fragment",
+                                "Flying Fish", "Thunder Fragment", "Silver Magmafish",
+                                "Lord Jawbus Shard", "Emperor's Skull", "Squid Boots", "Carmine Dye")
+                        .note("Seven of the ten entries were replaced. \"Lord Jawbus\" and "
+                                + "\"Thunder\" are the CREATURES, not loot -- they now appear as the "
+                                + "things those two actually pay -- and \"Reindrake Fragment\", "
+                                + "\"Plhlegblast Pearl\" and \"Sea Emperor Fragment\" are not items "
+                                + "at all. \"Shark Tooth Necklace\" has no tierless form: all five "
+                                + "tiers are separate items, so the bare name could never have "
+                                + "matched a chat line. "
+                                + "The fishing analogue of a Minos Inquisitor: the corpus already did the "
                                 + "rarity filtering with its own rare flag, and these are minutes to "
                                 + "hours apart. NO MARKERS ON PURPOSE -- the announcements share no "
                                 + "literal whatsoever (\"What is this creature!?\" does not even name "
@@ -795,12 +899,17 @@ public final class LootSourceRegistry {
                         .samples(
                                 " GOOD CATCH! You caught 36,064 Coins!",
                                 "§6 §r§6§lGREAT CATCH! §r§fYou caught a §r§7[Lvl 1] §r§aSquid§r§f!")
-                        .jackpot("Squid", "Megalodon", "Flying Fish", "Blue Whale", "Deep Sea Orb",
-                                "Water Snake Shard", "Giant Water Bug Shard")
-                        .note("Treasure Chance reaches the fifties with good gear, so a GOOD CATCH "
+                        .jackpot("Squid", "Megalodon", "Flying Fish", "Blue Whale", "Deep Sea Orb")
+                        .note("The two attribute shards left this list: the Water Snake and Giant "
+                                + "Water Bug shards are hunting shards syphoned into the Hunting Box, "
+                                + "not treasure catches. The four pets stayed, against an audit note "
+                                + "that called them sea-creature drops, because this source's own "
+                                + "captured sample is a treasure catch paying one: \"GREAT CATCH! You "
+                                + "caught a [Lvl 1] Squid!\". A captured line outranks a table. "
+                                + "Treasure Chance reaches the fifties with good gear, so a GOOD CATCH "
                                 + "lands on a large minority of catches and most of them are coins "
-                                + "or bait. The pet form and the shard form are the ones worth "
-                                + "celebrating and both are matchable by name. Restricting the "
+                                + "or bait. The pet form is the one worth "
+                                + "celebrating and it is matchable by name. Restricting the "
                                 + "detector to the OUTSTANDING tier and defaulting ALWAYS would be "
                                 + "the cleaner design, but no cited rate for that tier could be "
                                 + "found, so it is not shipped as a guess.")
@@ -811,9 +920,14 @@ public final class LootSourceRegistry {
                         .gate(SourceGate.island("Galatea"))
                         .markers("BONUS GIFT")
                         .samples("                                §r§d§lBONUS GIFT")
-                        .jackpot("Tree the Fish", "Chameleon", "Deep Root", "Foraging Wisdom Booster",
-                                "Sweep Booster")
-                        .note("The right answer to the user's own headline example, and the single "
+                        .jackpot("Tree the Fish", "Chameleon Shard", "Hummingbird Shard", "Deep Root",
+                                "Common Foraging Wisdom Booster", "Common Sweep Booster")
+                        .note("Three spellings corrected and one drop added. A Tree Gift pays the "
+                                + "Chameleon and Hummingbird SHARDS, not the creatures, and the two "
+                                + "boosters ship at a rarity that Hypixel prints -- \"Common Sweep "
+                                + "Booster\", never the bare noun -- so the old names could not have "
+                                + "matched a real line. "
+                                + "The right answer to the user's own headline example, and the single "
                                 + "most future-proof rule in the whole feature: Hypixel prints the "
                                 + "drop odds ON THE LINE (\"Tree the Fish (0.05%)\"), so the jackpot "
                                 + "decision can be a numeric threshold on a captured group rather "
@@ -842,8 +956,13 @@ public final class LootSourceRegistry {
                         .gate(SourceGate.island("Galatea"))
                         .markers("fell from the Tree!")
                         .samples("§r§7A §r§dPhanpyre §r§7fell from the Tree!")
-                        .jackpot("Dreadwing", "Grizzly Bear", "Puck")
-                        .note("Rare, discrete, named, and it spawns a mob that then drops shards -- a "
+                        .jackpot("Dreadwing Shard", "Phanpyre Shard", "Phanflare Shard")
+                        .note("The three tree phantoms are Phanpyre, Phanflare and Dreadwing -- the "
+                                + "source's own sample line names one of them -- so the Grizzly Bear "
+                                + "and Puck that used to be here were the wrong creatures entirely, "
+                                + "and all three were spelled as the creature rather than as the "
+                                + "shard that actually drops. "
+                                + "Rare, discrete, named, and it spawns a mob that then drops shards -- a "
                                 + "natural double beat for the widget. A handful an hour at most.")
                         .build(),
 
@@ -869,7 +988,12 @@ public final class LootSourceRegistry {
                                 "RARE CROP! Cropie (+97)",
                                 "RARE CROP! Seasoning (+115) (automatically donated)")
                         .jackpot("Helianthus", "Fermento", "Warty", "Rarefinder Chip")
-                        .note("With full Fermento or Helianthus armour these fire several times a "
+                        .note("Warty stays here, and deliberately: Hypixel's own resource pack files "
+                                + "its model under island_relevant/foraging_2, which is Galatea, but "
+                                + "the wiki is explicit that it drops from harvesting mature Nether "
+                                + "Wart with the Wart Eater attribute. That is farming, so this is "
+                                + "its source. The pack path is art organisation, not a drop table. "
+                                + "With full Fermento or Helianthus armour these fire several times a "
                                 + "minute, and Cropie and Squash are near-continuous. The name list "
                                 + "splits cleanly by value and the item is captured in the trigger "
                                 + "line, so name matching needs no extra parsing. The trailing "
@@ -885,9 +1009,18 @@ public final class LootSourceRegistry {
                                 "§6§lRARE DROP! §9Mutant Nether Wart §8x9 §e(§e+134)",
                                 "§6§lRARE DROP! §r§aNot Just a Pest Vinyl §r§6(Cocoaleech)")
                         .jackpot("Slug", "Wings of Harmony Vinyl", "Not Just a Pest Vinyl",
-                                "DynaMITES Vinyl", "Mutant Nether Wart", "Pesterminator",
-                                "Ultimate Sunset")
-                        .note("Pre-filtered by the server -- the line only appears for RARE and PET "
+                                "DynaMITES Vinyl", "Mutant Nether Wart", "Pesterminator I",
+                                "Sunset I", "Beady Eyes", "Locust Larva", "Clipped Wings",
+                                "Wriggling Larva", "Mantid Claw", "Fire in a Bottle", "Squeaky Toy",
+                                "Bookworm's Favorite Book")
+                        .note("Eight of the pests' rare drops were missing entirely and are now here. "
+                                + "Two names were also wrong: Pesterminator and Sunset are "
+                                + "ENCHANTMENTS -- the Beetle and the Lunar Moth drop them as "
+                                + "Enchanted Books, and Hypixel always prints a tier, so the tiered "
+                                + "spelling is the one that matches. \"Ultimate Sunset\" was the "
+                                + "internal id. Slug is the Slug PET, which is the real drop off the "
+                                + "Slug pest and is spelled the way chat spells a pet. "
+                                + "Pre-filtered by the server -- the line only appears for RARE and PET "
                                 + "drops -- genuinely rare, and it covers the whole Vinyl system. "
                                 + "One of the few gathering sources where ALWAYS needs no argument. "
                                 + "Two drops print no message at all and can only be seen by an "
@@ -914,9 +1047,14 @@ public final class LootSourceRegistry {
                         .gate(SourceGate.island("Garden"))
                         .markers("OFFER ACCEPTED")
                         .samples("§6§lOFFER ACCEPTED §8with §6Sirius §8(§6§lLEGENDARY§8)")
-                        .jackpot("Space Helmet", "Jungle Key", "Flowering Bouquet",
-                                "Overgrown Grass", "Green Bandana", "Music Rune")
-                        .note("ALWAYS, but the detector must do the rarity filter and emit only for "
+                        .jackpot("Space Helmet", "Lucky Clover", "Poignant Lucky Clover",
+                                "Astronaut Minion Skin", "Wild Strawberry Dye", "Poppy",
+                                "Voter's Badge")
+                        .note("Five of the six old entries were not on the visitor reward table at "
+                                + "all -- the Jungle Key opens the Jungle Temple, and NEU's lore for "
+                                + "it says so -- and only the Space Helmet survived. This is the "
+                                + "legendary visitor's own reward list. "
+                                + "ALWAYS, but the detector must do the rarity filter and emit only for "
                                 + "LEGENDARY, MYTHIC and SPECIAL: a Garden main accepts visitors "
                                 + "constantly, and rolling on every handover would be the most "
                                 + "repetitive thing in the game. Honest limitation -- the reward "
@@ -955,8 +1093,14 @@ public final class LootSourceRegistry {
                         .samples(
                                 "§6A Golden Goblin has spawned!",
                                 "§6A §r§bDiamond Goblin §r§6has spawned!")
-                        .jackpot("Golden Goblin Egg", "Diamond Goblin Egg")
-                        .note("Minutes to hours apart, and rare enough that the reference mod gives "
+                        .jackpot("Red Goblin Egg", "Blue Goblin Egg", "Green Goblin Egg",
+                                "Yellow Goblin Egg")
+                        .note("Both old entries were invented. There are exactly four coloured goblin "
+                                + "eggs plus the plain one; there is no golden and no diamond egg, "
+                                + "and Hypixel's own resource pack corroborates that -- "
+                                + "island_relevant/mining_3/goblins/eggs holds four models and no "
+                                + "more. "
+                                + "Minutes to hours apart, and rare enough that the reference mod gives "
                                 + "it a screen title and a sound of its own. The kill's drops arrive "
                                 + "on the standard banner, so this line opens the loot window and "
                                 + "the shared parser covers the payoff.")
@@ -969,8 +1113,16 @@ public final class LootSourceRegistry {
                         .gate(SourceGate.season("Hoppity's Hunt"))
                         .markers("HOPPITY'S HUNT")
                         .samples("§d§lHOPPITY'S HUNT §r§dYou found a §r§9Chocolate Lunch Egg §r§don a ledge next to the stairs up§r§d!")
-                        .jackpot("El Dorado", "Rabbit the Fish", "Fish the Rabbit", "Solomon")
-                        .note("Three meal eggs per SkyBlock day per island, roughly twenty real "
+                        .jackpot("Rabbit the Fish")
+                        .note("One entry, and it is the only one of the four that was an item. El "
+                                + "Dorado, Solomon and Fish the Rabbit are RABBITS -- Chocolate "
+                                + "Factory employees the player collects, confirmed on the wiki -- "
+                                + "so three quarters of this reel was scrolling loot that cannot "
+                                + "exist as a stack. (\"Rabbit the Fish\" and \"Fish the Rabbit\" are "
+                                + "a deliberate Hypixel joke: only the first is an item.) What a meal "
+                                + "egg actually pays is chocolate and a rabbit, so there is little "
+                                + "more to list; the strip tops up generically. "
+                                + "Three meal eggs per SkyBlock day per island, roughly twenty real "
                                 + "minutes apart, each a discrete low-frequency reward with a "
                                 + "guaranteed rabbit inside: the same cadence as a Diana burrow. "
                                 + "Nothing here fires often enough to become noise.")
@@ -982,8 +1134,9 @@ public final class LootSourceRegistry {
                         .rareBanner()
                         .markers("HOPPITY'S HUNT")
                         .samples("§D§LHOPPITY'S HUNT §7You found §6Solomon §7(§6§LLEGENDARY§7)!")
-                        .jackpot("El Dorado", "Rabbit the Fish", "Fish the Rabbit", "Solomon")
-                        .note("The rarity is handed to us inside the line, so the jackpot keys on the "
+                        .note("No jackpot list, because a rabbit is not an item and this source pays "
+                                + "nothing but rabbits -- which is exactly why it needs none: the "
+                                + "rarity is handed to us inside the line, so the jackpot keys on the "
                                 + "rarity group rather than a name list and cannot drift. WATCH THE "
                                 + "CASE: Hypixel really sends UPPER-CASE formatting codes on this "
                                 + "one line, and any hand-rolled code stripper that assumes "
@@ -991,21 +1144,26 @@ public final class LootSourceRegistry {
                         .build(),
 
                 LootSourceInfo.builder(LootSource.CHOCOLATE_FACTORY_STRAY, "Chocolate Factory Stray")
-                        .policy(RollPolicy.ON_JACKPOT_ITEM_ONLY)
+                        .policy(RollPolicy.NEVER)
                         .gate(SourceGate.screen("Chocolate Factory"))
                         .triggers(TriggerKind.SCREEN_TITLE)
                         .markers("stray", "CAUGHT!")
                         .samples(
                                 "§7You caught a stray §6§lGolden Rabbit§7! §7You gained §6+13,566,571 Chocolate§7!",
                                 "§6El Dorado §d§lCAUGHT!")
-                        .jackpot("Golden Rabbit", "El Dorado", "Fish the Rabbit", "Side Dish")
-                        .note("The clearest case anywhere for not defaulting to ALWAYS: an active "
-                                + "chocolate player sees several strays a minute and a session would "
-                                + "spin the reels hundreds of times. Golden Rabbit, El Dorado and "
-                                + "Fish the Rabbit are the only strays anyone celebrates and all "
-                                + "three are named in the line, so the jackpot list does all the "
-                                + "work. Note the Factory runs year-round, not only during the hunt, "
-                                + "so the GUI title is the gate rather than the season.")
+                        .note("Shipped off, and the policy had to change to say so. It was "
+                                + "ON_JACKPOT_ITEM_ONLY over a list of four names of which NONE was "
+                                + "an item: Golden Rabbit is a stray OUTCOME, El Dorado, Fish the "
+                                + "Rabbit and Side Dish are rabbits. A jackpot-only policy over a "
+                                + "list nothing can ever match is a detector that cannot fire, which "
+                                + "this file's own invariants forbid, so the honest reading is NEVER "
+                                + "with no list -- a stray pays Chocolate, a currency, and there is "
+                                + "no item outcome to celebrate. That also settles the pacing "
+                                + "argument this note used to make: an active chocolate player sees "
+                                + "several strays a minute and a session would spin the reels "
+                                + "hundreds of times. Note the Factory runs year-round, not only "
+                                + "during the hunt, so the GUI title is the gate rather than the "
+                                + "season.")
                         .build(),
 
                 LootSourceInfo.builder(LootSource.YEAR_OF_THE_PIG_ORB, "Shiny Orb")
@@ -1072,8 +1230,13 @@ public final class LootSourceRegistry {
                         .gate(SourceGate.area("Hub", "Carnival"))
                         .markers("TREASURE!")
                         .samples("TREASURE! There is a Dragonfruit nearby.")
-                        .jackpot("Dragonfruit")
-                        .note("Barely a lottery: the board is solvable and it pays Carnival Tokens "
+                        .jackpot("Dragonfruit", "Mango", "Coconut", "Apple", "Cherry",
+                                "Pomegranate", "Durian", "Watermelon")
+                        .note("All eight fruits the dig can reveal, not just the one. None of the "
+                                + "eight except Apple exists in the NEU item database -- they are "
+                                + "board pieces rather than stacks -- so they sit on the name test's "
+                                + "allowlist as one family, with the wiki as their evidence. "
+                                + "Barely a lottery: the board is solvable and it pays Carnival Tokens "
                                 + "rather than items, so there is almost nothing for a reel to land "
                                 + "on. The Dragonfruit is the one genuinely rare reveal, which is "
                                 + "why the constant exists at all; shipped off and opt-in.")

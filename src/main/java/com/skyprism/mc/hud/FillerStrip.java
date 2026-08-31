@@ -83,10 +83,16 @@ final class FillerStrip {
      * of saying something false about it. Each has a row of its own in {@code drop_symbols.json}
      * on a distinct vanilla item, and each is glinted -- which is what keeps them apart from the
      * plain accessories some sources drop onto the same items. A Hunter Ring is a bare gold ingot
-     * precisely so that Enchanted Gold can be the glinted one.</p>
+     * precisely so that Enchanted Gold Ingot can be the glinted one.</p>
+     *
+     * <p>Every name here is spelled the way Hypixel spells it, and pinned to that by
+     * {@code SkyBlockNameSnapshotTest}: the first entry read "Enchanted Gold" until that test went
+     * in, which is the internal id ({@code ENCHANTED_GOLD}) rather than the display name, so the
+     * one string that scrolls on more reels than any other in the mod was a string the server
+     * never prints.</p>
      */
     private static final List<String> GENERIC = List.of(
-            "Enchanted Gold",
+            "Enchanted Gold Ingot",
             "Enchanted Diamond",
             "Enchanted Iron Ingot",
             "Enchanted Redstone Block",

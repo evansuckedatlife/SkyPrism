@@ -318,11 +318,28 @@ class LootConfigTest {
         @Test
         @DisplayName("ON_JACKPOT_ITEM_ONLY is fine when a list is actually there")
         void jackpotOnlyWithItems() {
-            LootSource source = LootSource.LOOT_CHEST;
+            // Asked for rather than named. This used to be LOOT_CHEST, whose shipped list was
+            // later emptied -- its five entries turned out to be POWDER_CHEST's copied verbatim --
+            // and the test then failed for a reason that had nothing to do with what it checks.
+            LootSource source = firstWithAJackpotList();
             var config = SkyPrismConfig.defaults();
             config.loot.settingsFor(source).policy = RollPolicy.ON_JACKPOT_ITEM_ONLY;
             assertEquals(RollPolicy.ON_JACKPOT_ITEM_ONLY,
                     config.sanitized().lootPolicy(source));
+        }
+
+        /** Any source that ships a jackpot list, so ON_JACKPOT_ITEM_ONLY on it is satisfiable. */
+        private static LootSource firstWithAJackpotList() {
+            for (LootSource source : LootSource.values()) {
+                // Diana is excluded for the same reason firstWithoutBanner excludes it: its
+                // settings come from config.diana, not from loot.sources, so an override written
+                // there is not the thing this test is about.
+                if (source != LootSource.DIANA_MYTHOLOGICAL
+                        && !LootSourceRegistry.info(source).jackpotItems().isEmpty()) {
+                    return source;
+                }
+            }
+            throw new AssertionError("no source ships a jackpot list at all");
         }
 
         /** Any source the research found no server rarity flag for; several exist. */

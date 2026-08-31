@@ -56,7 +56,7 @@ public final class SimulatedLoot {
         "Ancient Claw",
         "Enchanted Ancient Claw",
         "Griffin Feather",
-        "Enchanted Gold",
+        "Enchanted Gold Ingot",
         "Enchanted Iron Ingot",
         "Enchanted Redstone Block",
         "Enchanted Diamond",
@@ -107,7 +107,7 @@ public final class SimulatedLoot {
     private static final String[] GENERIC_FILLER = {
         "Enchanted Redstone Block",
         "Enchanted Diamond",
-        "Enchanted Gold",
+        "Enchanted Gold Ingot",
         "Enchanted Iron Ingot",
     };
 

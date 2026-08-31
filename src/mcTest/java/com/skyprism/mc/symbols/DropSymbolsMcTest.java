@@ -216,7 +216,7 @@ final class DropSymbolsMcTest {
         "'16x Ancient Claw',            minecraft:flint",
         "'32x Ancient Claw',            minecraft:flint",
         "'Ancient Claw x16',            minecraft:flint",
-        "'Enchanted Gold x16',          minecraft:gold_ingot",
+        "'Enchanted Gold Ingot x16',    minecraft:gold_ingot",
         "'16x Enchanted Gold Ingot',    minecraft:gold_ingot",
         "'2x Griffin Feather',          minecraft:feather",
         "'1x Mythological Dye',         minecraft:yellow_dye",
@@ -302,7 +302,7 @@ final class DropSymbolsMcTest {
         // Burrow treasure, every spade tier.
         "Griffin Feather", "Braided Griffin Feather", "Mythos Fragment", "Myth the Fish", "Coins",
         // The shared creature pool.
-        "Ancient Claw", "Enchanted Ancient Claw", "Enchanted Gold", "Enchanted Gold Ingot",
+        "Ancient Claw", "Enchanted Ancient Claw", "Enchanted Gold Ingot",
         "Mythological Dye",
         // One signature drop per creature, all twelve.
         "Hilt of Revelations", "Crochet Tiger Plushie", "Washed-up Souvenir", "Cretan Urn",
@@ -386,10 +386,21 @@ final class DropSymbolsMcTest {
      * boss can pay, so testing only those leaves the commonest clash invisible. Every group below
      * is one fight's rare-and-above drops as
      * <a href="https://hypixelskyblock.minecraft.wiki">hypixelskyblock.minecraft.wiki</a> lists them,
-     * read on 2026-08-30, and each caught a real collision when it was first run: Summoning Eye and
-     * Etherwarp Merger were both the eye of ender until the Voidgloom row went in, Spider Catalyst
-     * and Tarantula Catalyst shared one row until the Broodfather row went in, and Bundle of Magma
-     * sat on the magma cream that Magma Cream Distillate needed.
+     * read on 2026-08-30 and corrected against it again on 2026-08-31, and each caught a real
+     * collision when it was first run: Summoning Eye and Etherwarp Merger were both the eye of
+     * ender until the Voidgloom row went in, and Spider Catalyst and Tarantula Catalyst shared one
+     * row until the Broodfather row went in.
+     *
+     * <p><b>Six names here were themselves wrong</b>, which is worth recording because a fixture
+     * that claims to be transcribed and is not is a worse lie than an untested table. There is no
+     * Ender Catalyst, Blaze Catalyst or Wolf Catalyst -- SkyBlock has nine catalysts and none of
+     * those three is among them, and the Sven page lists no catalyst at all. "Bundle of Magma" is
+     * the same object as the "Bundle of Magma Arrows" listed beside it, and "Grizzly Bait" the same
+     * object as "Grizzly Salmon"; each pair was one item under two names, so the tables were also
+     * silently asserting that a boss pays a thing twice. And the Glacite corpse table was six
+     * eighths wrong -- there is no Vanguard armour, and the Yog, Mineral and Lapis helmets are not
+     * corpse loot. The name-snapshot test in {@code core} exists so that the next such name fails
+     * the build instead of sitting in a fixture as evidence for itself.
      *
      * <p>Keep these in step with the wiki when Hypixel changes a table. A name that disappears is
      * harmless; a name that appears is the one that needs a row.
@@ -402,7 +413,7 @@ final class DropSymbolsMcTest {
                         "End Rune", "Enchant Rune", "Sinful Dice",
                         "Exceedingly Rare Ender Artifact Upgrade", "Handy Blood Chalice",
                         "Pocket Espresso Machine", "Etherwarp Merger", "End Stone Idol",
-                        "Byzantium Dye", "Ender Catalyst", "Void Conqueror Enderman Skin")),
+                        "Byzantium Dye", "Void Conqueror Enderman Skin")),
                 Arguments.of("Revenant Horror", List.of(
                         "Beheaded Horror", "Scythe Blade", "Festering Maggot", "Snake Rune I",
                         "Severed Hand", "Shredded Sinew", "Warden Heart", "Matcha Dye",
@@ -414,7 +425,7 @@ final class DropSymbolsMcTest {
                 Arguments.of("Sven Packmaster", List.of(
                         "Spirit Rune I", "Enchanted Book", "Furball", "Red Claw Egg",
                         "Couture Rune I", "Grizzly Salmon", "Overflux Capacitor", "Celeste Dye",
-                        "Grizzly Bait", "Hamster Wheel", "Wolf Catalyst")),
+                        "Hamster Wheel", "Wolf Tooth")),
                 Arguments.of("Inferno Demonlord", List.of(
                         "Lavatears Rune I", "Wisp's Ice-Flavored Water I Splash Potion",
                         "Bundle of Magma Arrows", "Mana Disintegrator", "Scorched Books",
@@ -423,7 +434,7 @@ final class DropSymbolsMcTest {
                         "Gabagool Distillate", "Scorched Power Crystal", "Flawed Opal Gemstone",
                         "Archfiend Dice", "Fiery Burst Rune I", "High Class Archfiend Dice",
                         "Wilson's Engineering Plans", "Subzero Inverter", "Flame Dye",
-                        "Bundle of Magma", "Blaze Catalyst", "Enchanted Book")),
+                        "Enchanted Book")),
                 Arguments.of("Necron's reward chest", List.of(
                         "Recombobulator 3000", "Necron's Handle", "Shadow Warp", "Implosion",
                         "Wither Shield", "Dark Claymore", "Giant's Sword", "Shadow Fury",
@@ -441,9 +452,9 @@ final class DropSymbolsMcTest {
                         "Flawless Jasper Gemstone", "FTX 3070", "Synthetic Heart", "Control Switch",
                         "Robotron Reflector", "Electron Transmitter", "Superlite Motor")),
                 Arguments.of("Glacite corpse", List.of(
-                        "Ascension Rope", "Fine Onyx Gemstone", "Flawless Onyx Gemstone",
-                        "Pickonimbus 2000", "Vanguard Helmet", "Armor of Yog Helmet",
-                        "Mineral Helmet", "Lapis Armor Helmet")));
+                        "Fine Onyx Gemstone", "Flawless Onyx Gemstone", "Glacite Jewel",
+                        "Bejeweled Handle", "Frozen Scute", "Caged Wisp", "Shattered Locket",
+                        "Dwarven O's Metallic Minis")));
     }
 
     @ParameterizedTest(name = "{0}")
