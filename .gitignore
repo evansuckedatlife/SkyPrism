@@ -1,0 +1,44 @@
+# Gradle
+.gradle/
+build/
+versions/*/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Dev-client output. Everything else a run produces is already ignored above; this
+# directory was the one hole, and it holds latest.log plus the per-node run logs, which
+# carry absolute paths off whatever machine ran them.
+logs/
+
+# Stonecutter generated state
+.stonecutter/
+versions/*/.gradle/
+versions/*/build.gradle
+versions/*/build.gradle.kts
+versions/*/settings.gradle
+versions/*/settings.gradle.kts
+stonecutter-cache/
+
+# Minecraft dev runtime
+run/
+runs/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.eclipse/
+.classpath
+.project
+.settings/
+bin/
+out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# JVM crash debris from dev-client runs
+hs_err_pid*.log
+replay_pid*.log

@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "package": "com.skyprism.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "AbstractClientPlayerMixin",
+    "ClientPacketListenerOpenScreenMixin",
+    "EntityRendererNameTagMixin",
+    "PlayerInfoMixin",
+    "PlayerTabOverlayMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

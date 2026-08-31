@@ -1,0 +1,118 @@
+# Builds SkyPrism for both Minecraft nodes and runs both test suites.
+#
+# Everything here is derived from the build scripts rather than guessed:
+# `buildAllVersions`, `testAllVersions`, `mcTestAllVersions` and the root `clean`
+# are registered in stonecutter.gradle.kts, and `buildAndCollect` in
+# build.gradle.kts is what puts each node's jar in build/libs/<mc>/.
+#
+# Not yet verified: this workflow has never executed on GitHub Actions. The task
+# names, paths and the JDK requirement are read from the repository, but the run
+# itself -- Loom downloading Minecraft on a Linux runner, in particular -- is
+# untested here.
+name: Build
+
+# Push and pull request, with no branch filter, because the repository's default
+# branch is not assumed anywhere else in this file either. A pull request from a
+# branch in this repository will therefore build twice; the concurrency group
+# below at least stops superseded runs from piling up.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Both Minecraft nodes
+    runs-on: ubuntu-latest
+    # Two Minecraft versions, each downloading and processing its own merged jar
+    # on a cold cache. 45 minutes is slack, not an estimate.
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # The project is developed on Windows, where git may not have recorded the
+      # wrapper's executable bit. One line, and it removes a first-run failure
+      # that looks nothing like its cause.
+      - name: Make the Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      # JDK 25 is mandatory: gradle/gradle-daemon-jvm.properties pins the daemon
+      # to toolchainVersion=25, build.gradle.kts declares a Java 25 toolchain,
+      # and the mixin config declares compatibilityLevel JAVA_25. Installing it
+      # here means Gradle finds it locally instead of provisioning one through
+      # the foojay resolver on every run.
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # Caches ~/.gradle (dependencies and the Gradle distribution) and validates
+      # the wrapper jar against the published checksums.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Loom keeps the merged Minecraft jars and their processed forms in the
+      # project directory, not in ~/.gradle, so setup-gradle does not cover them.
+      # It is ~280 MB for the two nodes and it is the slowest part of a cold
+      # build. Keyed on the files that decide which Minecraft and Fabric
+      # artifacts are needed.
+      - name: Cache Loom's Minecraft artifacts
+        uses: actions/cache@v4
+        with:
+          path: .gradle/loom-cache
+          key: loom-${{ runner.os }}-${{ hashFiles('gradle.properties', 'settings.gradle.kts', 'versions/*/gradle.properties') }}
+          restore-keys: loom-${{ runner.os }}-
+
+      # Builds the jar for every node registered in settings.gradle.kts. `build`
+      # depends on `check`, so this also runs the bare-JVM unit suite on both
+      # nodes -- there is no separate step for it.
+      #
+      # Stonecutter rewrites the one shared src/ tree in place as it moves
+      # between nodes, which is why gradle.properties sets org.gradle.parallel to
+      # false. Do not add --parallel here.
+      - name: Build and unit-test every node
+        run: ./gradlew buildAllVersions
+
+      # `mcTest` is deliberately not part of `check`, so it needs its own
+      # invocation. It is the only automated coverage of the adapters whose
+      # behaviour is cross-version sensitive, which makes it the suite CI most
+      # needs to run on both nodes.
+      - name: Minecraft-aware tests on every node
+        run: ./gradlew mcTestAllVersions
+
+      # buildAndCollect copies each node's jar to build/libs/<mc>/. The sources
+      # jar stays in versions/<mc>/build/libs/ and is not uploaded.
+      - name: Upload the 26.1.2 jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: skyprism-mc26.1.2
+          path: build/libs/26.1.2/*.jar
+          if-no-files-found: error
+
+      - name: Upload the 26.2 jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: skyprism-mc26.2
+          path: build/libs/26.2/*.jar
+          if-no-files-found: error
+
+      # A failing assertion in the log tells you which test broke; the HTML
+      # report tells you what it saw. Only worth collecting when something did
+      # in fact break.
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            versions/*/build/reports/tests/
+            versions/*/build/test-results/
+          if-no-files-found: ignore
