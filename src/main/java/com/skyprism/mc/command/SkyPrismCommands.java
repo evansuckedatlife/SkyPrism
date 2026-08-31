@@ -136,7 +136,12 @@ public final class SkyPrismCommands {
                         .executes(SkyPrismCommands::status)
 
                         .then(ClientCommands.literal("preview")
-                                .executes(ctx -> preview(ctx, 0, 600))
+                                // Not a literal 600. That was the second copy of the range rule,
+                                // and it drifted the moment the chroma default moved to 600: the
+                                // grid stopped at the threshold, so the one screen built to show
+                                // the shimmer opened with no shimmer in it. The screen derives its
+                                // own top from the live threshold; this asks it for the same one.
+                                .executes(ctx -> preview(ctx, 0, LevelPreviewScreen.defaultMaxLevel()))
                                 .then(ClientCommands.argument("min", IntegerArgumentType.integer(0, 999_999))
                                         .then(ClientCommands.argument("max", IntegerArgumentType.integer(0, 999_999))
                                                 .executes(ctx -> preview(ctx,
@@ -334,7 +339,9 @@ public final class SkyPrismCommands {
             }
         }
 
-        // The reel strip is ten names; what the mod has learned is not bounded by it. Without
+        // The line above counts every name the reel strips can put on screen -- the union across
+        // all sixty-four sources, not one strip's ten, since the strips went per source. What the
+        // mod has learned is still not bounded by even that union. Without
         // this second line a player who has just captured a drop that is not on the strip sees
         // no evidence of it anywhere, and "the capture never fired" and "the capture fired for
         // something the first line does not cover" look identical.

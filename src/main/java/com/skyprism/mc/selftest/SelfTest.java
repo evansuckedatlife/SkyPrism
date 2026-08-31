@@ -141,6 +141,31 @@ public final class SelfTest {
      */
     private static final int CHROMA_LEAD_IN = 20;
 
+    /**
+     * The GUI scale the two palette frames are photographed at.
+     *
+     * <p>The rest of the run is shot at whatever the client picked, which on a 1920x1080
+     * framebuffer is Mojang's auto scale of 4. That is right for the slot machine -- it is one
+     * widget and it wants to be large enough to read the drop names under the reels -- and wrong
+     * for this screen. The preview is a grid, and the thing it exists to show is the sweep of the
+     * ramp from level 0 to the top of the range. At scale 4 the grid fits about twelve columns of
+     * ten rows, so the published screenshot was roughly a hundred and ten consecutive levels out
+     * of six hundred: a flat-looking slice, and a reader could not see a gradient in it because
+     * over a hundred levels there barely is one.</p>
+     *
+     * <p>Halving the scale doubles the columns and doubles the rows, so about four times as many
+     * cells land in the same 1920x1080 frame -- nearly the whole range at once, the chroma band
+     * included. The text halves with it, which is the trade: the header stays legible at full
+     * size, and the cells are colour samples whose number only has to be readable when somebody
+     * opens the image, not in the README's inline thumbnail.</p>
+     *
+     * <p>Applied to the framebuffer through {@code Options.guiScale()} rather than to a pose
+     * stack, because a pose-stack scale would shrink the drawing and leave the layout believing
+     * it still had the old width -- the same twelve columns, drawn smaller. Only a real scale
+     * change makes {@code layout()} choose more of them.</p>
+     */
+    private static final int PALETTE_GUI_SCALE = 2;
+
     /** Ordinary drops: nothing rare, so {@code SlotRoll.jackpot()} stays false. */
     private static final List<LootDrop> ORDINARY_DROPS = List.of(
             new LootDrop("Griffin Feather", "9", 1, false),
@@ -245,6 +270,17 @@ public final class SelfTest {
 
     /** The palette preview, once opened, so it can be scrolled onto the animated band. */
     private LevelPreviewScreen preview;
+
+    /**
+     * The client's own GUI scale, saved while the palette frames borrow a smaller one.
+     *
+     * <p>{@link Integer#MIN_VALUE} means "nothing borrowed", which is the state every step
+     * outside the two palette shots runs in. Kept so the restore is the value that was actually
+     * there rather than a guess: the shipped {@code options.txt} says 0, meaning auto, and a
+     * restore that wrote a literal 4 would quietly convert a player's auto setting into a fixed
+     * one on any machine whose display picks something else.</p>
+     */
+    private int borrowedGuiScaleFrom = Integer.MIN_VALUE;
 
     /**
      * The side-by-side pack comparison, created before anything is taught.
@@ -380,11 +416,17 @@ public final class SelfTest {
                 ConfigGui::available);
 
         // --- 2. the palette preview, twice, to catch chroma moving --------------------------
-        call("open the level palette preview, levels 0..600", () -> {
+        // Scale first, then open: the grid measures its columns in init(), so a screen opened at
+        // the old scale and rescaled afterwards would be laid out twice for no reason.
+        call("borrow GUI scale " + PALETTE_GUI_SCALE + " for the palette frames", this::borrowGuiScale);
+        delay(LAYOUT_TICKS);
+        call("open the level palette preview", () -> {
             preview = new LevelPreviewScreen(null);
             show(preview);
-            return "LevelPreviewScreen(null) draws 0..600 through SkyPrismServices.level()"
-                    + ".palette(), the same instance chat and TAB colour with";
+            return "LevelPreviewScreen(null) draws " + preview.minLevel() + ".."
+                    + preview.maxLevel() + " -- the range it derived from the live chroma"
+                    + " threshold, not a literal -- through SkyPrismServices.level().palette(),"
+                    + " the same instance chat and TAB colour with";
         });
         delay(LAYOUT_TICKS);
         call("scroll the preview onto the chroma threshold", () -> {
@@ -443,6 +485,10 @@ public final class SelfTest {
             return "the two files differ (" + first.length + " and " + second.length
                     + " bytes), so the animated band really is a different colour in each";
         });
+        // Everything from here on is the slot machine and the settings screen, both of which want
+        // the client's own scale back.
+        call("give the GUI scale back", this::restoreGuiScale);
+        delay(LAYOUT_TICKS);
 
         // --- 3. the HUD placement screen ----------------------------------------------------
         call("open the HUD placement screen", () -> {
@@ -801,7 +847,6 @@ public final class SelfTest {
         config.levels.applyToChat = true;
         config.levels.applyToTabList = true;
         config.levels.chromaEnabled = true;
-        config.levels.chromaMinLevel = 300;
         config.levels.chromaCyclesPerSecond = 0.5;
         config.levels.chromaUpdateHz = 60;
 
@@ -815,7 +860,13 @@ public final class SelfTest {
         // here that disagrees with the default documents something nobody has. Brackets are the
         // case in point -- they used to be pinned off while the default was off, and the default
         // is now on, so pinning them off would now photograph the wrong mod.
+        //
+        // chromaMinLevel is the case that caught this out. It was pinned to a literal 300 while
+        // the shipped default was 400 and then 600, so every published palette screenshot carried
+        // a header reading "chroma on from level 300" -- a threshold no player has ever had. It is
+        // read off the shipped defaults now, with the rest, so it cannot fall behind again.
         SkyPrismConfig shipped = new SkyPrismConfig();
+        config.levels.chromaMinLevel = shipped.levels.chromaMinLevel;
         config.levels.recolourBrackets = shipped.levels.recolourBrackets;
         config.levels.mode = shipped.levels.mode;
         config.levels.gradientPreset = shipped.levels.gradientPreset;
@@ -1152,6 +1203,59 @@ public final class SelfTest {
         return drops;
     }
 
+    /**
+     * Drops the client to {@link #PALETTE_GUI_SCALE} so the palette frames hold most of the range.
+     *
+     * <p>In memory only, exactly like {@link #stageSettings()}: {@code Options.save()} is never
+     * called, so {@code options.txt} on disk keeps whatever the developer had. The previous value
+     * is remembered rather than assumed -- see {@link #borrowedGuiScaleFrom}.</p>
+     *
+     * <p>{@code resizeGui()} is what makes it take: setting the option only stores a number, and
+     * the window keeps handing out the old scaled width until something recomputes it. That call
+     * also re-runs {@code resize} on whatever screen is open, which is how the grid learns it has
+     * more columns to lay out into.</p>
+     */
+    private String borrowGuiScale() throws Skipped {
+        Minecraft client = Minecraft.getInstance();
+        if (client == null) {
+            throw new Skipped("no client, so there is no window to rescale");
+        }
+        if (borrowedGuiScaleFrom == Integer.MIN_VALUE) {
+            borrowedGuiScaleFrom = client.options.guiScale().get();
+        }
+        client.options.guiScale().set(PALETTE_GUI_SCALE);
+        client.resizeGui();
+        return "GUI scale " + describeGuiScale(borrowedGuiScaleFrom) + " -> "
+                + PALETTE_GUI_SCALE + ", so the window is "
+                + client.getWindow().getGuiScaledWidth() + "x"
+                + client.getWindow().getGuiScaledHeight()
+                + " scaled pixels and the grid lays out about four times as many cells."
+                + " In memory only: Options.save() is not called, so options.txt is untouched";
+    }
+
+    /** Puts back whatever {@link #borrowGuiScale()} took, and is a no-op if it never ran. */
+    private String restoreGuiScale() {
+        if (borrowedGuiScaleFrom == Integer.MIN_VALUE) {
+            return "nothing was borrowed";
+        }
+        int original = borrowedGuiScaleFrom;
+        borrowedGuiScaleFrom = Integer.MIN_VALUE;
+        Minecraft client = Minecraft.getInstance();
+        if (client == null) {
+            return "no client left to restore on";
+        }
+        client.options.guiScale().set(original);
+        client.resizeGui();
+        return "GUI scale back to " + describeGuiScale(original) + ", window "
+                + client.getWindow().getGuiScaledWidth() + "x"
+                + client.getWindow().getGuiScaledHeight() + " scaled pixels";
+    }
+
+    /** Names the auto setting, because "0" on its own reads as a broken value in the summary. */
+    private static String describeGuiScale(int value) {
+        return value == 0 ? "0 (auto)" : String.valueOf(value);
+    }
+
     private static void show(Screen screen) {
         Minecraft client = Minecraft.getInstance();
         if (client != null) {
@@ -1202,6 +1306,15 @@ public final class SelfTest {
         }
         finished = true;
         program.clear();
+
+        // Belt and braces: the scripted restore is a step like any other, and the watchdog and the
+        // driver's own catch both end the run without reaching it. Leaving a borrowed GUI scale
+        // behind would be a self test that changed the developer's client.
+        try {
+            restoreGuiScale();
+        } catch (Throwable stuck) {
+            LOGGER.warn("SkyPrism self test could not give the GUI scale back", stuck);
+        }
 
         Path summary = null;
         try {

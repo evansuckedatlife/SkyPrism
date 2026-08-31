@@ -164,7 +164,7 @@ The animated hue sweep for high-level tags.
 | Screen | JSON key | Default | Range | What it does |
 |---|---|---|---|---|
 | Enable chroma | `levels.chromaEnabled` | `false` | boolean | Whether tags at or above the threshold get the animated sweep on top of their base colour. |
-| Chroma from level | `levels.chromaMinLevel` | `400` | 0–999,999,999 | Lowest level that shimmers. 400 because a shimmer everybody has is not a flex. The screen offers this as a free-entry number field, so the clamp is what actually bounds it. |
+| Chroma from level | `levels.chromaMinLevel` | `600` | 0–999,999,999 | Lowest level that shimmers. 600 keeps the shimmer at the very top of the ladder, where it reads as extraordinary rather than as decoration — it replaces the palette colour outright, so once a dozen tags in a lobby shimmer there is nothing left to escalate to. The screen offers this as a free-entry number field, so the clamp is what actually bounds it. |
 | Chroma speed | `levels.chromaCyclesPerSecond` | `0.35` | 0.01–10.0, NaN → 0.35 | Full trips around the hue wheel per second. Past the top end it reads as a strobe rather than as colour. |
 | Chroma refresh rate | `levels.chromaUpdateHz` | `30` | 1–240 | How often the shimmer colour is recomputed, decoupled from frame rate. At 30 Hz a shimmering TAB entry is rebuilt at most once every 33 ms however fast the client renders. |
 | Chroma saturation | `levels.chromaSaturation` | `0.90` | 0.0–1.0, NaN → 0.90 | How vivid the sweep is. At 0 it becomes a moving grey. |
@@ -172,6 +172,16 @@ The animated hue sweep for high-level tags.
 
 Saturation and lightness were hard-coded in the adapter until schema v3. If your file came from v2 it
 carries them explicitly at `0.90` and `0.62` — see [Versioning](#versioning-and-migration).
+
+`chromaMinLevel` shipped at `400` before, and moving the default did **not** move anybody's setting.
+Every build of the mod writes the key out explicitly, so an existing `config.json` already carries a
+number and Gson binds that over the new default; `600` is what a fresh install gets, or a file with
+the key deleted. There is no migration for this and none is wanted — see
+[Versioning](#versioning-and-migration) for the cases that do need one.
+
+The palette preview sizes its own range from this setting rather than from a fixed `0–600`, so the
+shimmering band is always several rows deep on screen whether you run the threshold at 300, at the
+shipped 600, or at 800.
 
 ### Tag detection
 

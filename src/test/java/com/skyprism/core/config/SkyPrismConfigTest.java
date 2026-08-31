@@ -104,6 +104,108 @@ class SkyPrismConfigTest {
         }
     }
 
+    /**
+     * The chroma threshold's shipped default, and the far more important question of what
+     * happens to a player who already picked one.
+     *
+     * <p>The default moved from 400 to 600 so the shimmer stays a mark of the very top of
+     * the ladder. Moving a default is only ever safe because Gson binds a stored value over
+     * the field initialiser, and that is a property of the file rather than of the field --
+     * so it is asserted here directly, on the shape a real file has, rather than assumed.
+     * These tests are the reason a later retune of this number is a one-line change instead
+     * of a migration.
+     */
+    @Nested
+    @DisplayName("the chroma threshold default")
+    class ChromaThreshold {
+
+        /**
+         * A file of the shape every shipped build writes, with one hole for the threshold.
+         * Deliberately minimal: absent groups take their own defaults, which is the point.
+         */
+        private String fileWithThreshold(int chromaMinLevel) {
+            return "{\"configVersion\": " + SkyPrismConfig.CONFIG_VERSION
+                    + ", \"levels\": {\"chromaEnabled\": true, \"chromaMinLevel\": "
+                    + chromaMinLevel + "}}";
+        }
+
+        @Test
+        @DisplayName("a fresh install shimmers only from 600, the top of the ladder")
+        void freshInstallStartsAtSixHundred() {
+            assertEquals(600, LevelSettings.DEFAULT_CHROMA_MIN_LEVEL,
+                    "the shipped threshold is 600; if this is being changed on purpose,"
+                            + " docs/CONFIG.md documents the same number");
+            assertEquals(LevelSettings.DEFAULT_CHROMA_MIN_LEVEL,
+                    SkyPrismConfig.defaults().levels.chromaMinLevel,
+                    "the field initialiser must read the constant, not repeat the number");
+        }
+
+        @Test
+        @DisplayName("the shipped default is already legal, so a first launch does not snap it")
+        void theDefaultSurvivesSanitizing() {
+            var clean = SkyPrismConfig.defaults().sanitized();
+            assertEquals(LevelSettings.DEFAULT_CHROMA_MIN_LEVEL, clean.levels.chromaMinLevel);
+            assertTrue(LevelSettings.DEFAULT_CHROMA_MIN_LEVEL >= LevelSettings.LEVEL_FLOOR
+                            && LevelSettings.DEFAULT_CHROMA_MIN_LEVEL <= LevelSettings.LEVEL_CEILING,
+                    "a default outside its own clamp would be repaired out from under the user");
+        }
+
+        @Test
+        @DisplayName("a file written under the old 400 default keeps 400")
+        void theOldDefaultIsNotOverwritten() {
+            var loaded = ConfigCodec.fromJson(fileWithThreshold(400)).orElseThrow();
+            assertEquals(400, loaded.levels.chromaMinLevel,
+                    "everyone already running this mod has 400 in their file; raising the"
+                            + " shipped default must not silently repaint their threshold");
+            assertNotEquals(LevelSettings.DEFAULT_CHROMA_MIN_LEVEL, loaded.levels.chromaMinLevel);
+        }
+
+        @Test
+        @DisplayName("a threshold the player chose by hand survives, high or low")
+        void aChosenThresholdSurvives() {
+            assertEquals(120, ConfigCodec.fromJson(fileWithThreshold(120))
+                    .orElseThrow().levels.chromaMinLevel);
+            assertEquals(300, ConfigCodec.fromJson(fileWithThreshold(300))
+                    .orElseThrow().levels.chromaMinLevel);
+            assertEquals(850, ConfigCodec.fromJson(fileWithThreshold(850))
+                    .orElseThrow().levels.chromaMinLevel);
+        }
+
+        @Test
+        @DisplayName("a stored threshold survives a save/load round trip unchanged")
+        void aStoredThresholdSurvivesARoundTrip() {
+            var chosen = SkyPrismConfig.defaults();
+            chosen.levels.chromaEnabled = true;
+            chosen.levels.chromaMinLevel = 275;
+
+            var reloaded = ConfigCodec.fromJson(ConfigCodec.toJson(chosen)).orElseThrow();
+            assertEquals(275, reloaded.levels.chromaMinLevel);
+            assertEquals(chosen, reloaded, "nothing else moved either");
+        }
+
+        @Test
+        @DisplayName("the key is always written out, which is what makes moving the default safe")
+        void theKeyIsAlwaysWritten() {
+            // The whole no-migration argument rests on this: a config the mod has ever saved
+            // carries the number explicitly, so a later default can never reach it. If the
+            // codec ever started omitting fields that equal their default, changing this
+            // number would start rewriting thresholds people chose -- and this is the test
+            // that would fail first.
+            assertTrue(ConfigCodec.toJson(SkyPrismConfig.defaults()).contains("chromaMinLevel"),
+                    "an omitted key would let a future default overwrite a stored choice");
+        }
+
+        @Test
+        @DisplayName("only a file with no threshold in it at all picks up the new default")
+        void anAbsentKeyTakesTheNewDefault() {
+            var loaded = ConfigCodec.fromJson(
+                    "{\"configVersion\": " + SkyPrismConfig.CONFIG_VERSION
+                            + ", \"levels\": {\"chromaEnabled\": true}}").orElseThrow();
+            assertEquals(LevelSettings.DEFAULT_CHROMA_MIN_LEVEL, loaded.levels.chromaMinLevel,
+                    "no key means no choice was ever made, so the default is the right answer");
+        }
+    }
+
     @Nested
     @DisplayName("sanitized() numeric clamps")
     class Clamps {

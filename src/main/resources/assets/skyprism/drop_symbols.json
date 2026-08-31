@@ -54,7 +54,7 @@
     {
       "names": ["Control Switch", "Control Switches"],
       "item": "minecraft:lever",
-      "why": "Custom texture, and the only Diana drop the slot machine names in its own filler strip that had no row at all -- so every spinning reel drew the fallback chest for it. SkyBlock draws it as a switch on a plate; the vanilla lever is the same object and the same silhouette at 16x16."
+      "why": "Custom texture, and the row that was missing when every spinning reel drew one hand-written strip -- so the fallback chest blurred past in its place. It is Crystal Hollows loot, never Diana loot, and now that the strips are per source it scrolls on the Powder Chest and nowhere else. SkyBlock draws it as a switch on a plate; the vanilla lever is the same object and the same silhouette at 16x16."
     },
     {
       "names": ["Griffin Feather", "Griffin Feathers"],

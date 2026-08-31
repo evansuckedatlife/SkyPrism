@@ -79,8 +79,10 @@ import java.util.List;
  * call, which is an enum comparison, and returns. No {@code Minecraft} lookup, no config read,
  * no {@code ItemStack}, no {@code Component}, no allocation of any kind happens above that
  * line, and nothing the jackpot act adds below it is reachable while the machine is idle.
- * Everything the drawing path needs that can be hoisted -- the filler strip, its resolved item
- * icons, the legacy-colour lookup table -- is hoisted into {@code static} state built once.</p>
+ * Everything the drawing path needs that can be hoisted -- the filler strips, their resolved item
+ * icons, the legacy-colour lookup table -- is hoisted into {@code static} state built once. Going
+ * per source did not change that: {@link FillerStrip} builds all sixty-four at class-init and
+ * hands one back with an array load, and a roll resolves which one it is exactly once.</p>
  *
  * <p><b>Why the roll is cached in a field rather than fetched per frame.</b>
  * {@code DianaController.roll()} is not free: it re-derives a {@code SlotRollConfig} record so
@@ -349,34 +351,12 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
     /** Per-column offset, so the three drums are not in lockstep. */
     private static final long REEL_STRIP_OFFSET_MILLIS = 50L;
 
-    /**
-     * Filler shown on a reel that has not locked yet.
-     *
-     * <p>Real Diana loot names, because a strip of placeholder symbols would not tell the
-     * player at a glance what kind of machine this is. Static and immutable: the spinning path
-     * must not allocate.</p>
-     */
-    private static final String[] FILLER = {
-            "Griffin Feather", "Daedalus Stick", "Crown of Greed", "Washed-up Souvenir",
-            "Dwarf Turtle Shelmet", "Antique Remedies", "Control Switch", "Ancient Claw",
-            "Enchanted Gold", "Coins"
-    };
-
-    /**
-     * The filler names: the one list of drop names the machine shows on <em>every</em> spin.
-     *
-     * <p>It exists as a method because two things outside the drawing code need it, and both
-     * needed it for the same reason -- this array and {@code drop_symbols.json} are separate
-     * files that nothing was comparing. "Control Switch" sat here unmapped, so a fallback chest
-     * blurred past on every roll the mod has ever drawn and no test could see it. The test that
-     * pins every name to a mapped sprite closed that; {@link #symbolNames()} exposes the same
-     * list to {@code /skyprism status}, which reports where each one's sprite is coming from.</p>
-     *
-     * @return the filler strip's names, in order
-     */
-    static List<String> fillerNames() {
-        return List.of(FILLER);
-    }
+    // The symbols a reel scrolls before it locks live in FillerStrip, one strip per LootSource.
+    // They were one static array here for as long as the machine was Diana's alone, which is
+    // exactly how a Crystal Hollows Control Switch ended up blurring past under a Minos Champion
+    // caption: the array was written when Diana was the only source and never generalised, so all
+    // sixty-four sources scrolled Diana's loot. See FillerStrip for where the names come from and
+    // why the drawing path still never allocates.
 
     /**
      * Legacy colour letter to packed {@code 0xRRGGBB}, built once.
@@ -655,15 +635,6 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
     private static final int SPRITE_CUTOFF_ALPHA = 8;
 
     /**
-     * How stale a resolved filler sprite may be before it is looked up again.
-     *
-     * <p>Long enough that the cost is nothing -- nine map probes twice a second, and only while
-     * a reel is spinning -- and short enough that a symbol learned off a drop the player just
-     * picked up is wearing its real art by the next spin rather than the next session.</p>
-     */
-    private static final long FILLER_REFRESH_MILLIS = 500L;
-
-    /**
      * How many distinct stacks may fail to render before sprites are given up on entirely.
      *
      * <p>Small on purpose. One broken item model is a bad row in somebody's resource pack; nine
@@ -676,8 +647,9 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
      * Stacks whose model threw when it was submitted, compared by identity and never
      * dereferenced.
      *
-     * <p>Render-thread only and never read while empty, exactly like {@link #fillerIcons}, so
-     * it deliberately carries no synchronisation. {@link DropSymbols} hands out one shared stack
+     * <p>Render-thread only and never read while empty, exactly like a {@link FillerStrip}'s own
+     * sprite array, so it deliberately carries no synchronisation. {@link DropSymbols} hands out
+     * one shared stack
      * per symbol, so identity is the right test and this array is the right size: it is keyed on
      * the object that failed, not on a name that might be spelled two ways.</p>
      */
@@ -695,45 +667,10 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
     private static boolean registered;
 
     /**
-     * The scale every filler name is drawn at, resolved from the widest one in {@link #FILLER}
-     * the first time a reel actually spins.
-     *
-     * <p>Render-thread only, and idempotent -- two threads racing here would compute the same
-     * float from the same immutable array -- so it deliberately carries no synchronisation.
-     * It cannot be {@code static final} because {@link Font} does not exist at class-init, and
-     * it is not invalidated on a resource-pack swap because a font reload moves the answer by
-     * a pixel or two at most, which is not worth a check on every frame of every spin.</p>
-     */
-    private static float spinLabelScale;
-
-    /**
-     * {@link #FILLER}'s item sprites, held in one array so the spinning path never allocates.
-     *
-     * <p>Same reasoning as {@link #spinLabelScale}, plus one of its own: an {@code ItemStack}
-     * cannot be built at class-init because the item registry is not loaded yet. By the time a
-     * reel is spinning a world is on screen, so it certainly is. Building a fresh array of nine
-     * every frame would otherwise be the one allocation the spinning path is not allowed to
-     * make.</p>
-     *
-     * <p><b>The array is reused; its contents are not frozen.</b> Resolving these once for the
-     * session was right while a symbol's sprite was a constant, and became wrong the day
-     * {@link DropSymbols} started learning items off real drops -- a filler that resolved to the
-     * generic fallback on the first spin of the session would have kept drawing the fallback
-     * for the rest of it, and the player would have had to restart the game to see the Hypixel
-     * art the mod had already learned. So the entries are refreshed in place every
-     * {@link #FILLER_REFRESH_MILLIS} while a reel is actually spinning: nine hash probes twice
-     * a second, into the array that already exists, on a path that only runs while the machine
-     * is on screen.</p>
-     */
-    private static ItemStack[] fillerIcons;
-
-    /** When {@link #fillerIcons} was last resolved, on the roll's own clock. */
-    private static long fillerIconsAt;
-
-    /**
      * Width of {@link #JACKPOT_TEXT} in the vanilla font, resolved on first use.
      *
-     * <p>Same reasoning as {@link #spinLabelScale}: the string is a compile-time constant, so
+     * <p>Same reasoning as {@link FillerStrip#labelScale()}: the string is a compile-time
+     * constant, so
      * re-measuring it -- which decomposes it glyph by glyph -- on every frame of every jackpot
      * was paying for an answer that cannot change.
      */
@@ -837,6 +774,23 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
      * a frame for several seconds, to arrive at the same answer every time.</p>
      */
     private String magicFindText;
+
+    /**
+     * The symbols this roll's spinning reels scroll, resolved once from the roll's own source.
+     *
+     * <p>Per roll rather than per frame because {@code SlotRoll.sourceAt} is a sweep and a field
+     * read and {@link FillerStrip#of} is an array load, and doing both on every frame of every
+     * spin to arrive at the same answer is the sort of cost the class javadoc's performance
+     * contract exists to refuse. A roll cannot change source once it is running -- a second event
+     * restarts it, which bumps {@code rollId} and clears this along with everything else.</p>
+     *
+     * <p>Deliberately absent from {@link #hasPerRollState}, which is a six-field read on the idle
+     * path and worth keeping that way. Nothing goes wrong if a finished roll leaves its strip
+     * behind: the reference is to an immutable session-lived singleton, nothing reads it while the
+     * machine is idle, and the {@code rollId} check at the top of {@link #extractRenderState}
+     * clears it before the next roll's first frame is ever drawn.</p>
+     */
+    private FillerStrip strip;
 
     /**
      * Whether {@link #magicFindText} has been worked out for this roll.
@@ -1003,7 +957,26 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
         actTwoStartedAt = 0L;
         magicFindText = null;
         magicFindResolved = false;
+        strip = null;
         Arrays.fill(jackpotLockAt, 0L);
+    }
+
+    /**
+     * The strip this roll's spinning reels scroll.
+     *
+     * <p>Resolved on the first frame that needs it rather than when the roll is installed, because
+     * the roll is installed from the chat thread and this is the render thread's own answer to a
+     * render-thread question. Null source -- a roll that has just stopped running, which a frame
+     * can land on either side of -- takes {@link FillerStrip#unknown()} rather than Diana's.</p>
+     */
+    private FillerStrip strip(SlotRoll current, long now) {
+        FillerStrip cached = this.strip;
+        if (cached != null) {
+            return cached;
+        }
+        FillerStrip resolved = FillerStrip.of(current.sourceAt(now));
+        this.strip = resolved;
+        return resolved;
     }
 
     private void draw(GuiGraphicsExtractor graphics, SlotRoll current, long now) {
@@ -1227,6 +1200,10 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
             drawSpinUpSweep(graphics, boxWidth, boxHeight, alpha, gold, spinUp);
         }
 
+        // What this roll's unlocked reels scroll: the rolling source's own loot, resolved once for
+        // the roll. A dungeon chest scrolls dungeon chest drops and a trophy fish scrolls fish.
+        FillerStrip strip = strip(current, now);
+
         // The item a jackpot converges on. Null outside the second act, which is what keeps the
         // ordinary roll's strip generic and its windows plain.
         LootDrop jackpotDrop = isJackpotAct(state) ? current.jackpotSymbolAt(now) : null;
@@ -1243,12 +1220,13 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
         // with a spinning reel whose captions changed size as they scrolled past; uniformity is
         // what makes the sizing read as designed rather than as a bug. The jackpot's own name is
         // folded in even while its reels are still spinning, so nothing resizes when they land.
-        float nameSize = nameScale(font, reels, jackpotLabel);
+        float nameSize = nameScale(font, reels, jackpotLabel, strip);
 
         for (int i = 0; i < reels.size(); i++) {
             int left = PADDING + i * (REEL_WIDTH + REEL_GAP);
             drawReel(graphics, font, reels.get(i), labels[i], left, PADDING, alpha, nameSize,
-                    names, now, state, gold, wave, hot, jackpotIcon, jackpotLabel, jackpotKey);
+                    names, now, state, gold, wave, hot, jackpotIcon, jackpotLabel, jackpotKey,
+                    strip);
         }
 
         // The third match, lighting the whole machine rather than one window. It is the only
@@ -1405,7 +1383,8 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
     private void drawReel(GuiGraphicsExtractor graphics, Font font, Reel reel, String label,
                           int left, int top, int alpha, float nameSize, boolean names,
                           long now, RollState state, double gold, double wave, int hot,
-                          ItemStack jackpotIcon, String jackpotLabel, String jackpotKey) {
+                          ItemStack jackpotIcon, String jackpotLabel, String jackpotKey,
+                          FillerStrip strip) {
         int right = left + REEL_WIDTH;
         int bottom = top + REEL_HEIGHT;
         // When the names are switched off the cell keeps its full height -- the panel must not
@@ -1460,7 +1439,8 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
         // rather than sitting on it in the ordinary roll's cool grey.
         int stripRgb = gold > 0.0 ? lerpRgb(FILLER_RGB, JACKPOT_GOLD, gold) : FILLER_RGB;
         drawSpinningReel(graphics, font, reel, left, top, right, bottom, cellTop, alpha,
-                nameSize, names, now, state, jackpotIcon, jackpotLabel, jackpotKey, stripRgb);
+                nameSize, names, now, state, jackpotIcon, jackpotLabel, jackpotKey, stripRgb,
+                strip);
 
         // A dimmed frame, so a spinning column is still recognisably one of three windows.
         // Without it the machine has no windows at all until the first reel stops, and the
@@ -1490,7 +1470,8 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
                                          int left, int top, int right, int bottom, int cellTop,
                                          int alpha, float nameSize, boolean names, long now,
                                          RollState state, ItemStack jackpotIcon,
-                                         String jackpotLabel, String jackpotKey, int stripRgb) {
+                                         String jackpotLabel, String jackpotKey, int stripRgb,
+                                         FillerStrip strip) {
         long period = isJackpotAct(state) ? JACKPOT_CELL_MILLIS : STRIP_CELL_MILLIS;
         long t = now + (long) reel.index() * REEL_STRIP_OFFSET_MILLIS;
         long cell = Math.floorDiv(t, period);
@@ -1502,7 +1483,8 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
         // the millisecond offset above only de-correlates where they are in their travel.
         int index = (int) cell + reel.index() * 3;
 
-        ItemStack[] fillers = fillerIcons(now);
+        String[] fillerNames = strip.names();
+        ItemStack[] fillers = strip.icons(now);
         int windowCentre = top + REEL_HEIGHT / 2;
         float fade = alpha / 255.0f;
 
@@ -1515,10 +1497,10 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
             for (int row = -1; row <= 1; row++) {
                 int slot = index + row;
                 boolean prize = jackpotIcon != null && (Math.floorMod(slot, 2) == 0);
-                int pick = Math.floorMod(slot, FILLER.length);
+                int pick = Math.floorMod(slot, fillerNames.length);
                 ItemStack icon = prize ? jackpotIcon : fillers[pick];
-                String name = prize ? jackpotLabel : FILLER[pick];
-                String key = prize ? jackpotKey : FILLER[pick];
+                String name = prize ? jackpotLabel : fillerNames[pick];
+                String key = prize ? jackpotKey : fillerNames[pick];
                 int rowTop = base + row * STRIP_PITCH;
                 // Dimmed by how far the cell is from the middle of the window, not by which of
                 // the three rows it happens to be. Row order is an artefact of the loop and
@@ -1986,16 +1968,18 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
      * <p>The size is chosen once for the whole machine: the smallest fit any name currently on
      * screen needs, capped at {@link #NAME_MAX_SCALE} because the caption is a subtitle under a
      * sprite rather than the content of the reel. While anything is still spinning that is the
-     * widest name in {@link #FILLER}, which is a constant, so a spin never changes size
-     * mid-scroll; and the jackpot's own name is folded in from the first frame of the second
-     * act, so the three captions do not resize as the reels land on it.</p>
+     * widest name on this roll's own {@link FillerStrip}, which is fixed for the length of the
+     * roll, so a spin never changes size mid-scroll; and the jackpot's own name is folded in from
+     * the first frame of the second act, so the three captions do not resize as the reels land on
+     * it.</p>
      *
      * <p>Floored at {@link #MIN_LABEL_SCALE}. At the {@link #NAME_BUDGET} a name gets, that
-     * floor holds 108 pixels of text -- wider than "Dwarf Turtle Shelmet", the longest name the
-     * machine can show -- so {@link #drawFitted}'s shortening branch is genuinely a last resort
-     * rather than the normal path it once was.</p>
+     * floor holds 108 pixels of text, so {@link #drawFitted}'s shortening branch is a last resort
+     * rather than the normal path it once was -- reached now only by the handful of genuinely long
+     * drop names the wider game has, such as "Void Conqueror Enderman Skin", and reached the same
+     * way whether such a name is on a spinning strip or under a reel that has landed on it.</p>
      */
-    private float nameScale(Font font, List<Reel> reels, String jackpotLabel) {
+    private float nameScale(Font font, List<Reel> reels, String jackpotLabel, FillerStrip strip) {
         float scale = NAME_MAX_SCALE;
         boolean spinning = false;
         for (int i = 0; i < reels.size(); i++) {
@@ -2006,7 +1990,7 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
             }
         }
         if (spinning) {
-            scale = Math.min(scale, spinLabelScale(font));
+            scale = Math.min(scale, spinLabelScale(font, strip));
         }
         if (jackpotLabel != null) {
             scale = Math.min(scale, fitScale(font, jackpotLabel, NAME_BUDGET));
@@ -2032,50 +2016,39 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
     }
 
     /**
-     * The scale at which every name in the filler strip fits its column. Computed once.
+     * The scale at which every name on one strip fits its column. Measured once per source.
      *
-     * <p>Because it is the minimum over a compile-time constant array it is itself constant,
-     * which is what keeps a caption the same size for the whole of its scroll past the
-     * window.</p>
+     * <p>Because it is the minimum over an array that is fixed for the life of the session it is
+     * itself a constant for that source, which is what keeps a caption the same size for the whole
+     * of its scroll past the window. It is cached on the strip rather than here because the strips
+     * are different lengths of word and one shared number would change under the player the first
+     * time a different source rolled.</p>
+     *
+     * <p>Measured here rather than inside {@link FillerStrip} because the budget and the two
+     * bounds belong to the widget's geometry, and {@link Font} does not exist at class-init.
+     * Idempotent -- two threads racing here would compute the same float from the same immutable
+     * array -- so it deliberately carries no synchronisation, and it is not invalidated on a
+     * resource-pack swap because a font reload moves the answer by a pixel or two at most, which
+     * is not worth a check on every frame of every spin.</p>
      */
-    private static float spinLabelScale(Font font) {
-        float cached = spinLabelScale;
+    private static float spinLabelScale(Font font, FillerStrip strip) {
+        float cached = strip.labelScale();
         if (cached > 0.0f) {
             return cached;
         }
         float worst = NAME_MAX_SCALE;
-        for (String name : FILLER) {
+        for (String name : strip.names()) {
             worst = Math.min(worst, fitScale(font, name, NAME_BUDGET));
         }
         worst = Math.max(MIN_LABEL_SCALE, worst);
-        spinLabelScale = worst;
+        strip.labelScale(worst);
         return worst;
     }
 
     /**
-     * {@link #FILLER}'s sprites; see the field for why they are not resolved at class-init and
-     * why the answers are refreshed rather than frozen.
-     *
-     * <p>The array is allocated at most once for the session and rewritten in place after that,
-     * so a refresh costs the probes and nothing else. {@code now} is the roll's own clock, the
-     * same instant every other value in the frame is derived from, so a machine that is not on
-     * screen never ages this at all.</p>
+     * {@link #JACKPOT_TEXT}'s width, measured once; same reasoning as
+     * {@link #spinLabelScale(Font, FillerStrip)}.
      */
-    private static ItemStack[] fillerIcons(long now) {
-        ItemStack[] cached = fillerIcons;
-        if (cached != null && now - fillerIconsAt < FILLER_REFRESH_MILLIS) {
-            return cached;
-        }
-        ItemStack[] icons = cached == null ? new ItemStack[FILLER.length] : cached;
-        for (int i = 0; i < FILLER.length; i++) {
-            icons[i] = DropSymbols.iconForName(FILLER[i]);
-        }
-        fillerIconsAt = now;
-        fillerIcons = icons;
-        return icons;
-    }
-
-    /** {@link #JACKPOT_TEXT}'s width, measured once; same reasoning as {@link #spinLabelScale}. */
     private static int jackpotTextWidth(Font font) {
         int cached = jackpotTextWidth;
         if (cached > 0) {
@@ -2414,12 +2387,21 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
     }
 
     /**
-     * @return the drop names the reels show on every spin, which is {@link #fillerNames()};
-     *         {@code /skyprism status} reports where each one's sprite is being resolved from
+     * The drop names a spinning reel can put on screen, across every source.
+     *
+     * <p>The union of every {@link FillerStrip} rather than one of them, because the strips are
+     * per source now and the player runs {@code /skyprism status} while nothing is rolling. The
+     * question the line answers -- how much of what the machine can draw is resolving through
+     * Hypixel's own art rather than through the fallback -- is about the whole machine, and a
+     * single source's strip would have answered it for whichever source happened to be hard-coded
+     * here.</p>
+     *
+     * @return the names, distinct and in source order; {@code /skyprism status} reports where
+     *         each one's sprite is being resolved from
      */
     @Override
     public List<String> symbolNames() {
-        return fillerNames();
+        return FillerStrip.allNames();
     }
 
     /** @return the widget's unscaled footprint as {@code [width, height]} */

@@ -369,6 +369,23 @@ public final class SkyPrismConfig {
         public static final double DEFAULT_CHROMA_LIGHTNESS = 0.62;
 
         /**
+         * Shipped chroma threshold: the lowest level that shimmers on a fresh install.
+         *
+         * <p>At 600 the shimmer is reserved for the very top of the ladder, so it reads as
+         * extraordinary rather than as decoration. The previous 400 was chosen as "roughly
+         * where the level stops being common", which is a weaker bar than an effect that
+         * <em>replaces</em> the palette colour outright deserves: once a dozen tags in a
+         * lobby shimmer, the eye learns to skip them and there is nothing left to escalate
+         * to. 600 also sits above the top of every shipped ramp, which is the honest reading
+         * of what the shimmer is saying -- "this player is beyond the top of your scale".
+         *
+         * <p>This is the default and nothing more. The field stays free-entry across the
+         * whole legal range, and a threshold already written in a file wins over it, so a
+         * player who picked 300 keeps 300 across upgrades.
+         */
+        public static final int DEFAULT_CHROMA_MIN_LEVEL = 600;
+
+        /**
          * Cap on hand-written stops and brackets. A file that somehow arrives with
          * thousands of entries would make every TAB redraw a longer binary search and the
          * config screen unscrollable; a palette a human wrote never needs more than this.
@@ -406,10 +423,20 @@ public final class SkyPrismConfig {
         public boolean chromaEnabled = false;
 
         /**
-         * Lowest level that shimmers. Defaults to 400 because a shimmer everybody has is
-         * not a flex, and 400 is roughly where the level itself stops being common.
+         * Lowest level that shimmers, inclusive, clamped to
+         * {@link #LEVEL_FLOOR}..{@link #LEVEL_CEILING}.
+         *
+         * <p>Ships at {@link #DEFAULT_CHROMA_MIN_LEVEL}, which moved up from 400 so the
+         * shimmer stays a mark of the very top of the ladder rather than ordinary
+         * decoration -- see that constant for the reasoning.
+         *
+         * <p>Raising the shipped default cannot disturb an existing install. Gson binds
+         * whatever the file says over this initialiser before anything reads the field, and
+         * every version of this mod has written the key out explicitly, so a player who
+         * chose a threshold keeps it. Only a fresh install, or a file with the key deleted,
+         * sees the new number.
          */
-        public int chromaMinLevel = 400;
+        public int chromaMinLevel = DEFAULT_CHROMA_MIN_LEVEL;
 
         /** Full trips around the hue wheel per second. */
         public double chromaCyclesPerSecond = 0.35;

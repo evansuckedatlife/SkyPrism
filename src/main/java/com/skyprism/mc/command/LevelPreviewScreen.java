@@ -16,8 +16,8 @@ import org.lwjgl.glfw.GLFW;
 /**
  * A wall of level tags in their real colours, so a palette can be tuned by eye.
  *
- * <p><b>Why a screen and not a chat dump.</b> A gradient is a judgement about how 600
- * colours sit <em>next to each other</em>. Printing twenty of them into chat answers a
+ * <p><b>Why a screen and not a chat dump.</b> A gradient is a judgement about how hundreds
+ * of colours sit <em>next to each other</em>. Printing twenty of them into chat answers a
  * different question - "is level 451 pink?" - and cannot show the thing that actually goes
  * wrong with a ramp, which is a flat stretch or a muddy crossing somewhere in the middle.
  * Seeing the whole run at once is the only way to catch that, and it is the difference
@@ -43,7 +43,7 @@ import org.lwjgl.glfw.GLFW;
  *
  * <p>Three consequences fall out of that for free, each of which the old inline painting got
  * wrong. A level outside the configured detector range is drawn in Hypixel's colours, because
- * the locator declines to match it - so previewing 0..600 with {@code maxLevel = 400} shows
+ * the locator declines to match it - so previewing 0..660 with {@code maxLevel = 400} shows
  * exactly where the recolour stops. With {@code levels.enabled} off, the whole grid shows what
  * the player will really see, which is Hypixel untouched. And the chroma underline marks only
  * cells the rewriter actually recoloured, since {@code recolourLevels} returns its argument by
@@ -52,7 +52,13 @@ import org.lwjgl.glfw.GLFW;
  * <p><b>Chroma animates here exactly as it will in chat</b>, including the refresh-rate
  * quantisation from {@link Palettes#quantise}: the shimmer you tune is the shimmer you get,
  * at the same frame budget. Levels above the chroma threshold carry a faint underline so it
- * is obvious where the animated band begins even when a still frame is being looked at.</p>
+ * is obvious where the animated band begins even when a still frame is being looked at.
+ * Nothing in this file knows what that threshold is: the header reads it off the live palette
+ * and the underline is drawn from {@link LevelPalette#isChromatic(int)}, so a preview that
+ * disagreed with the setting is not a bug that can be introduced here without deleting one of
+ * those two calls. The default range is derived from it too - see {@link #defaultMaxLevel()},
+ * which exists because a fixed 0..600 stopped being able to show the band at all once the
+ * shipped threshold reached 600.</p>
  */
 public final class LevelPreviewScreen extends Screen {
 
@@ -66,7 +72,7 @@ public final class LevelPreviewScreen extends Screen {
      * Done button centred on top of it. That fits only while the hint is short enough to stop
      * before {@code width / 2 - 60}, which is a promise about the GUI width and the
      * translation at once -- and it broke at GUI scale 4, where the effective width is small
-     * enough that "scroll or arrows to browse   levels 0-600" runs under the button and comes
+     * enough that "scroll or arrows to browse   levels 0-660" runs under the button and comes
      * out reading "...browse   leve". Two bands cannot collide however narrow the window gets.</p>
      */
     private static final int FOOTER = 44;
@@ -82,6 +88,43 @@ public final class LevelPreviewScreen extends Screen {
 
     /** Pixels of scroll per notch of the wheel; one row is deliberately more than a notch. */
     private static final int SCROLL_STEP = 22;
+
+    /**
+     * The lowest top the default range ever has: Hypixel's thirteen vanilla tiers with room
+     * above them for the levels people actually reach.
+     *
+     * <p>A floor rather than the answer. It is what the range comes out at whenever the
+     * chroma threshold is low enough not to need more room, which was every shipped default
+     * until the threshold moved to 600.</p>
+     */
+    private static final int BASE_MAX_LEVEL = 600;
+
+    /**
+     * Levels of chroma the default range guarantees above the configured threshold.
+     *
+     * <p>The screen exists partly to show what chroma looks like, and it can only do that if
+     * the animated band is more than a sliver. At the widths this grid lays out at -- ten to
+     * fifteen four-digit cells per row -- sixty levels is four to six full rows, enough that
+     * the shimmer reads as a band with a visible edge rather than as one odd-looking cell in
+     * the bottom corner.</p>
+     *
+     * <p>Without this the screen fails exactly where it is needed most. A fixed 0..600 range
+     * against a threshold of 600 leaves one eligible level, in the last cell, on a row the
+     * player has to scroll to the very end to see: the feature would be invisible in the one
+     * screen built to demonstrate it.</p>
+     */
+    private static final int CHROMA_HEADROOM = 60;
+
+    /**
+     * Hard ceiling on the range {@link #defaultMaxLevel()} will derive.
+     *
+     * <p>{@code chromaMinLevel} is a free-entry field clamped only by {@code LEVEL_CEILING},
+     * which is 999,999,999. Deriving a range from it unguarded would let one typed number ask
+     * this screen for a billion cells. The number matches the span {@code /skyprism preview}
+     * refuses beyond, so the widest range the screen opens itself with is a range a player
+     * could also have asked for by hand.</p>
+     */
+    private static final int MAX_DERIVED_MAX_LEVEL = 20_000;
 
     /**
      * The colour the square brackets arrive in, and therefore the colour they keep whenever
@@ -154,13 +197,51 @@ public final class LevelPreviewScreen extends Screen {
     }
 
     /**
-     * The briefed range, 0 to 600, which spans Hypixel's thirteen vanilla tiers with room
-     * above for the levels people actually reach.
+     * The default range: from 0 up to whatever {@link #defaultMaxLevel()} says the live
+     * chroma threshold needs, never less than {@link #BASE_MAX_LEVEL}.
      *
      * @param parent the screen to return to on close, may be null
      */
     public LevelPreviewScreen(Screen parent) {
-        this(parent, 0, 600);
+        this(parent, 0, defaultMaxLevel());
+    }
+
+    /**
+     * The top of the default range, high enough that the chroma band is actually on screen.
+     *
+     * <p>Derived from the live {@code chromaMinLevel} rather than hardcoded, because the two
+     * numbers have to move together and only one of them is a setting. A player on 300 gets
+     * the {@link #BASE_MAX_LEVEL} range they always had; the shipped 600 gets 660; a player
+     * on 800 gets 860. Nothing here needs editing when the shipped default next moves.</p>
+     *
+     * <p>Read at construction rather than per frame, unlike everything else on this screen:
+     * the range fixes the cell array and the scroll geometry, and a grid that resized itself
+     * under the player's cursor because a config screen was open in the background would be
+     * worse than a range that is one reopen out of date. The header and the underline still
+     * track the live value, so a threshold changed while this screen is open shows up
+     * immediately in the band -- only how far the grid runs past it waits.</p>
+     *
+     * <p>Deliberately not conditional on {@code chromaEnabled}. Somebody who opens this
+     * screen, sees "chroma off", and turns it on from the config screen should find the band
+     * already in range; a span that flipped with a toggle would also make the screenshot the
+     * self test takes depend on which order the settings were staged in.</p>
+     *
+     * <p>Clamped at both ends: an unsanitised live config can hold a negative threshold, and
+     * {@link #MAX_DERIVED_MAX_LEVEL} stops an enormous one asking for an enormous grid.</p>
+     *
+     * <p>Package-private rather than private so {@link SkyPrismCommands} can open the
+     * argument-less {@code /skyprism preview} on the same range this constructor uses.
+     * A command that hardcoded its own top would be the second copy of this rule, free to
+     * drift from the threshold the moment either moved -- the same failure the grid avoids
+     * by rendering through the shipped pipeline instead of imitating it.</p>
+     *
+     * @return the top of the default previewed range, inclusive
+     */
+    static int defaultMaxLevel() {
+        int threshold = Math.max(SkyPrismConfig.LevelSettings.LEVEL_FLOOR,
+                Math.min(MAX_DERIVED_MAX_LEVEL, settings().chromaMinLevel));
+        return Math.min(MAX_DERIVED_MAX_LEVEL,
+                Math.max(BASE_MAX_LEVEL, threshold + CHROMA_HEADROOM));
     }
 
     @Override
@@ -176,9 +257,10 @@ public final class LevelPreviewScreen extends Screen {
      * Recomputes the grid for the current window size.
      *
      * <p>The cell width is measured from the widest tag the range can produce rather than
-     * assumed, because a preview that ran to 600 would clip the moment somebody previewed to
-     * 1000, and a clipped digit in a colour picker is a bug that looks like a palette
-     * problem.</p>
+     * assumed, because a width fixed for a three-digit top would clip the moment somebody
+     * previewed to 1000, and a clipped digit in a colour picker is a bug that looks like a
+     * palette problem. That is load-bearing now that the range is derived: a high enough
+     * chroma threshold pushes the top of the default range into five digits on its own.</p>
      */
     private void layout() {
         cellWidth = font.width("[" + maxLevel + "]") + 12;
@@ -200,7 +282,7 @@ public final class LevelPreviewScreen extends Screen {
     /**
      * Scrolls so the row holding {@code level} is the first one under the header.
      *
-     * <p>Exists because a preview of 0..600 opens on levels 0..89 and, at the default chroma
+     * <p>Exists because the default range opens on levels 0..89 and, at any sane chroma
      * threshold, none of those animate -- so the screen a caller opened to watch the shimmer
      * shows the one part of the ramp that is guaranteed to hold still. The self test hit
      * exactly that: it photographed two frames a second apart, asserted from the palette
@@ -212,6 +294,30 @@ public final class LevelPreviewScreen extends Screen {
      *
      * @param level the level to bring into view; clamped to the previewed range
      */
+    /**
+     * The lowest level this screen is drawing, inclusive.
+     *
+     * <p>Public so a caller can report the range it actually got rather than recompute it. The
+     * self test does exactly that: it opens the screen with the argument-less constructor and
+     * then says what came out, which is a fact about this instance instead of a second guess at
+     * {@link #defaultMaxLevel()}'s arithmetic that could drift from it.</p>
+     *
+     * @return the first previewed level
+     */
+    public int minLevel() {
+        return minLevel;
+    }
+
+    /**
+     * The highest level this screen is drawing, inclusive.
+     *
+     * @return the last previewed level
+     * @see #minLevel()
+     */
+    public int maxLevel() {
+        return maxLevel;
+    }
+
     public void scrollToLevel(int level) {
         int clamped = Math.max(minLevel, Math.min(maxLevel, level));
         int row = (clamped - minLevel) / Math.max(1, columns);
@@ -323,6 +429,12 @@ public final class LevelPreviewScreen extends Screen {
         // Rate and vividness come from the palette's own clock where it has one, because that
         // clock is what colours the cells; only the refresh rate is read from config, and only
         // because that is what Palettes.quantise above is actually using.
+        //
+        // The threshold printed here is palette.chromaMinLevel(), the same field
+        // palette.isChromatic(level) tests to decide which cells get the underline in
+        // drawCell. One value, read twice, from the object doing the colouring -- so the
+        // number in this line and the row the band starts on cannot disagree, whatever the
+        // configured threshold is and whether or not it was changed since the screen opened.
         Component chroma = palette.chromaEnabled()
                 ? Component.translatable("skyprism.hud.preview.chroma.on",
                         String.valueOf(palette.chromaMinLevel()),
@@ -415,9 +527,9 @@ public final class LevelPreviewScreen extends Screen {
         int rowHeight = cellHeight + CELL_GAP;
         int gridLeft = PAD + Math.max(0, (width - PAD * 2 - (columns * (cellWidth + CELL_GAP) - CELL_GAP)) / 2);
 
-        // Only the rows the viewport can show are touched. At 600 levels this is a dozen
-        // rows instead of 601 cells, which keeps the screen at a flat cost no matter how
-        // wide the previewed range gets.
+        // Only the rows the viewport can show are touched. At the default range this is a
+        // dozen rows instead of six hundred-odd cells, which keeps the screen at a flat cost
+        // no matter how wide the previewed range gets.
         int firstRow = Math.max(0, scroll / rowHeight);
         int lastRow = (scroll + (bottom - top)) / rowHeight;
 
