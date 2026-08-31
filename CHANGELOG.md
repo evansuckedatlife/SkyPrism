@@ -4,7 +4,33 @@ All notable changes to SkyPrism are recorded here. Versions follow the
 `<mod version>+<minecraft version>` scheme used by the jar names, so `1.0.0` below ships as
 `skyprism-1.0.0+26.1.2.jar` and `skyprism-1.0.0+26.2.jar`.
 
-## Unreleased
+## 1.0.1 — 2026-08-31
+
+### Reel filler now matches the source that is rolling
+
+The spinning reels used one static list of drop names on every roll of every source. It was written
+when this was a Diana-only mod and never generalised, so a fishing roll scrolled Daedalus Sticks and a
+slayer roll scrolled Griffin Feathers. It also carried `Control Switch`, a Crystal Hollows mining item
+that has never been Diana loot — which is what made the problem visible on a Minos Champion roll.
+
+Filler is now resolved per source from the loot registry and cached once, so the strip tells you what
+kind of machine you are looking at. A test walks all 64 sources and fails if a strip borrows another
+source's loot, or contains a name with no sprite row — the gap that let the unmapped Control Switch
+through unnoticed.
+
+### Chroma is off until level 600
+
+Was 400. The animated shimmer now marks the very top of the ladder rather than being common. A value
+already stored in a config file wins over the new default.
+
+Two bugs surfaced by re-shooting the screenshots:
+
+- `SelfTest` pinned `chromaMinLevel` to a literal `300` inside a block documented as using shipped
+  defaults, so every published palette screenshot showed a threshold no player has ever had.
+- `/skyprism preview` hardcoded `0..600`, so against the new default the one screen built to
+  demonstrate chroma opened with none of it in frame. The range is derived from the threshold now.
+
+The palette screenshot in the README is shot at GUI scale 2 and shows 546 levels instead of 99.
 
 ### The slot machine now covers the whole game
 
