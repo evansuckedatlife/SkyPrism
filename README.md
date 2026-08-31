@@ -6,10 +6,6 @@ a proper colour range, and it turns every lucky drop in the game into a slot mac
 Built for Minecraft **26.1.2** and **26.2**. Client-side only — it reads what the server already sent
 you and draws it differently. It never sends anything to Hypixel.
 
-> **fear5s asked for this one.** Start with [What it actually does](#what-it-actually-does), then
-> [Try it in 30 seconds](#try-it-in-30-seconds) — you don't have to wait for a Diana mayor or a
-> lucky drop to see the whole thing working.
-
 ---
 
 ## What it actually does
