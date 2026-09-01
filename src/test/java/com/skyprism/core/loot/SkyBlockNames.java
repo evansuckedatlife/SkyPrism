@@ -185,16 +185,20 @@ final class SkyBlockNames {
     /**
      * Every distinct name the mod can put on screen, keyed by its normalised form.
      *
-     * <p>The three sources are the whole of it: a reel strip is its source's jackpot list plus the
-     * generic top-up, and every one of those has to resolve through a {@code drop_symbols.json}
-     * row, so covering the three covers every string a player can read off the widget.</p>
+     * <p>The three sources are the whole of it: a reel strip is a window onto its source's drop
+     * pool plus the generic top-up, and every one of those has to resolve through a
+     * {@code drop_symbols.json} row, so covering the three covers every string a player can read
+     * off the widget.</p>
      */
     static Map<String, Use> namesInUse(Path root) {
         Map<String, Set<String>> sites = new TreeMap<>();
         Map<String, String> spellings = new LinkedHashMap<>();
 
         for (LootSource source : LootSource.values()) {
-            for (String name : LootSourceRegistry.info(source).jackpotItems()) {
+            // dropPool, not jackpotItems: the ordinary half of a source's table scrolls on the same
+            // reel as the celebrated half, so a fake name there would reach a player's eyes exactly
+            // as fast and this test would never have looked at it.
+            for (String name : LootSourceRegistry.dropPool(source)) {
                 record(sites, spellings, name, source.name());
             }
         }

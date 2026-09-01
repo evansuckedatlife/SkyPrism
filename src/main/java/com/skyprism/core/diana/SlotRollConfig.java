@@ -7,21 +7,24 @@ package com.skyprism.core.diana;
  * the config screen can build a candidate, validate it by construction, and hand it over
  * atomically -- a half-applied set of durations would produce a roll whose phases overlap.
  *
- * <p>The durations compose into two consecutive acts. The first always plays:
+ * <p>The durations compose into two alternative routes that share an origin. An ordinary roll:
  * <pre>
  *   start ── spinMillis ──► reel 0 locks ── lockStaggerMillis ──► reel 1 locks ── ... ──►
- *   last reel locks ── settleMillis ──► (act two, or the fade)
+ *   last reel locks ── settleMillis ──► fade begins ── fadeMillis ──► IDLE
  * </pre>
- * The second plays only when a rare drop was captured before the first act finished, and nothing
- * about it reaches back into the first act -- a jackpot no longer buys the ordinary spin any extra
- * time, because a roll that visibly behaves differently from the outset has already given the
- * surprise away:
+ * A roll that captured a rare drop before the settle ended takes the second route instead, and
+ * branches off at the instant the first column would have locked -- so {@code lockStaggerMillis}
+ * and {@code settleMillis} are simply not on its timeline, and it never comes to a stop before the
+ * three of a kind:
  * <pre>
- *   settled ── reels break loose AND gold begins ── jackpotIntroMillis ──► gold fully in,
+ *   start ── spinMillis ──► gold begins, reels never stop ── jackpotIntroMillis ──► gold fully in,
  *   reels still turning ── jackpotSpinMillis ──► reel 0 lands ──
  *   jackpotLockStaggerMillis ──► reel 1 lands ── ... ──► last reel lands ── jackpotHoldMillis ──►
  *   fade begins ── fadeMillis ──► IDLE
  * </pre>
+ * A jackpot still buys the ordinary spin no extra time: {@code spinMillis} is where the branch is,
+ * not something the branch lengthens. A banner the server printed late moves the branch point to
+ * the banner instead, which is the only shape where part of the first route is walked as well.
  *
  * @param reelCount               number of columns, 1..5. More than five will not fit any sane
  *                                HUD width, and zero would make the roll meaningless.
@@ -122,8 +125,8 @@ public record SlotRollConfig(int reelCount,
     }
 
     /**
-     * The offset from the <em>end of the settle phase</em> at which reel {@code i} lands in the
-     * jackpot act, i.e. the gold wash plus the re-spin plus this reel's share of the stagger.
+     * The offset from the <em>start of the jackpot act</em> at which reel {@code i} lands, i.e. the
+     * gold wash plus the rest of the spin plus this reel's share of the stagger.
      *
      * <p>Saturating for the same reason as {@link #baseLockOffset(int)}, and in the same way: three
      * unbounded non-negative durations are being added here, so every partial sum is checked rather
@@ -138,7 +141,7 @@ public record SlotRollConfig(int reelCount,
         return sum < 0L ? Long.MAX_VALUE : sum;
     }
 
-    /** The offset from the end of the settle phase at which the jackpot reels start moving again. */
+    /** The offset from the start of the jackpot act at which the gold has finished washing in. */
     long jackpotSpinStartOffset() {
         return jackpotIntroMillis;
     }

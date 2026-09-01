@@ -8,15 +8,22 @@ package com.skyprism.core.diana;
  * pure function of {@code clock.millis()} and the roll's start time, which is what makes the
  * whole feature reproducible under a fixed clock in tests.
  *
- * <h2>Two acts</h2>
- * <p>An ordinary roll is the first four values and then {@link #FADING}. A roll that captured a
- * rare drop plays that first act <em>completely unchanged</em> -- the reels lock on the real loot,
- * at the ordinary instants, with no gold anywhere -- and only once it has fully settled does the
- * second act begin: the four {@code JACKPOT_*} phases, a casino three-of-a-kind on the winning
- * item. The jackpot is deliberately invisible until the normal result has been read, and then
- * arrives as one event rather than two -- the reels are unlocked and the gold is ramping from the
- * same instant, so {@link #JACKPOT_INTRO} and {@link #JACKPOT_SPIN} are two stretches of one
- * continuous spin rather than a pause followed by a spin.
+ * <h2>Two acts, and no stop between them</h2>
+ * <p>An ordinary roll is the first four values and then {@link #FADING}: it spins, it locks left to
+ * right on the real loot, it holds, it fades.
+ *
+ * <p>A roll that captured a rare drop takes a different route through the same enum, and the
+ * difference is that it never stops. It spins, and at the instant the first column would have
+ * locked it goes to {@link #JACKPOT_INTRO} instead -- the gold arrives over reels that are still
+ * turning -- then {@link #JACKPOT_SPIN}, then the columns land one at a time on the winning item in
+ * {@link #JACKPOT_LOCK}, then {@link #JACKPOT_HOLD} and the fade. {@link #LOCKING} and
+ * {@link #SETTLED} are skipped outright, which is the point: reached, they were a dead stop and a
+ * restart in the middle of the one animation that is meant to build.
+ *
+ * <p>The one exception is a banner Hypixel printed late. A rare captured after some columns have
+ * already locked opens act two on the spot, so such a roll does pass through {@link #LOCKING}, and
+ * through {@link #SETTLED} if every column had landed, before unlocking them again. That is the
+ * shortest stop the timing allows once the server has told us too late.
  *
  * <h2>Why the ordinals are the timeline</h2>
  * <p>{@link #FADING} sits last, after {@link #JACKPOT_HOLD}, rather than beside {@link #SETTLED}
@@ -48,14 +55,17 @@ public enum RollState {
     SETTLED,
 
     /**
-     * The gold washes in, and the reels break loose underneath it.
+     * The gold washes in over reels that have not stopped turning.
      *
-     * <p>Both at once, which is the point. Every column unlocks on the first instant of this
-     * phase and is already turning towards {@link SlotRoll#jackpotSymbol()}, while the colour
-     * ramps over the top of them on {@link SlotRoll#jackpotIntroProgress()} running 0 to 1. The
-     * beat that tells the player something else is about to happen is therefore a machine that
-     * has started moving again <em>and</em> started turning gold, rather than a still picture
-     * that changes colour and only afterwards decides to spin.
+     * <p>On the ordinary lucky roll no column has locked when this phase opens -- it opens at the
+     * instant the first one would have -- so there is nothing to unlock and nothing to restart, and
+     * the colour simply arrives on a machine already in motion, ramping on
+     * {@link SlotRoll#jackpotIntroProgress()} running 0 to 1 while every column turns towards
+     * {@link SlotRoll#jackpotSymbol()}. The beat that tells the player something else is about to
+     * happen is a spin that should have ended and did not.
+     *
+     * <p>After a late banner some columns had landed, and those unlock here. That is the one shape
+     * in which this phase has anything to break loose.
      */
     JACKPOT_INTRO,
 

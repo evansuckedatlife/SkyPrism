@@ -25,9 +25,10 @@ import java.util.Map;
  * schemas and the feedback on it was unanimous -- it is too much movement for a number
  * that changes once a week, and it throws away the tier landmarks players already read at
  * a glance. The table keeps Hypixel's own scheme below 480 and doubles its resolution,
- * then spends thirteen colours of its own above 480, which is where Hypixel simply stops:
- * the server's last tier is {@code 0xAA0000} and every level from 480 upwards is that one
- * dark red forever.</p>
+ * then spends six colours of its own above 480, which is where Hypixel simply stops: the
+ * server's last tier is {@code 0xAA0000} and every level from 480 upwards is that one dark
+ * red forever. Both halves step on the same 20-level cadence, so the whole table is one
+ * rhythm rather than a fine one bolted onto a coarse one.</p>
  *
  * <p><b>{@link #spectrum()} is still the default gradient</b> -- what
  * {@link #DEFAULT_PRESET_NAME} resolves to, what {@link #defaultRamp()} hands back, and
@@ -48,7 +49,9 @@ import java.util.Map;
  *
  * <p>The hand-written ramps span 0..600 because that covers the live SkyBlock level range
  * with room above it; {@link GradientRamp} clamps past the ends, so a future level 900
- * keeps the top colour rather than falling off the palette.</p>
+ * keeps the top colour rather than falling off the palette. {@link BracketTable} clamps the
+ * same way, which is why {@link #defaultBrackets()} can stop its last band at 580 and still
+ * have a deliberate, defined colour at 600 and at 9000.</p>
  */
 public final class PalettePresets {
 
@@ -86,14 +89,25 @@ public final class PalettePresets {
     private static final int FINE_WIDTH = 20;
 
     /**
-     * Levels per SkyPrism band above {@link #HYPIXEL_TOP_TIER_LEVEL}: half a fine bracket.
+     * Levels per SkyPrism band above {@link #HYPIXEL_TOP_TIER_LEVEL}: the same 20 as below it,
+     * so the shipped table steps on one uniform cadence the whole way up.
      *
-     * <p>The bands get twice the resolution of the vanilla half because that is where the
-     * levels people actually compare are. Below 480 a 20-level band is already finer than
-     * anything the server draws; above it, an unmodded client draws one colour for every
-     * level that will ever exist, so ten is as coarse as this half can afford to be.</p>
+     * <p><b>This was 10 through 1.0.3, and that is the bug.</b> The argument for 10 was that
+     * the range above 480 is where the levels people actually compare live, so it deserves
+     * twice the resolution of the vanilla half. It was resolution the palette could not pay
+     * for. Thirteen bands crammed into 480..600 have to sit around 11 degrees of hue apart,
+     * and once Hypixel's own 13 tiers are already on the table there is no arc of the wheel
+     * with that much clearance left. Measured on the shipped 1.0.3 table, the closest pair of
+     * bands anywhere was 0.0256 in Oklab (levels 550 and 570) and level 590's pale cyan sat
+     * 0.0869 from the level-200 aqua -- both well inside the range where two colours simply
+     * read as the same colour, which is what a player reported.</p>
+     *
+     * <p>Six bands at 20 buy the room back. The tightest pair anywhere in the table involving
+     * a SkyPrism band is now 0.1142, against a comfortable-separation threshold of about 0.10,
+     * and {@code PalettePresetsTest} holds the whole table to that floor rather than only
+     * checking neighbours -- which is why this shipped twice before anyone caught it.</p>
      */
-    private static final int BAND_WIDTH = 10;
+    private static final int BAND_WIDTH = FINE_WIDTH;
 
     /**
      * Where Hypixel's scale runs out: the first level of its last tier, {@code 0xAA0000}.
@@ -104,61 +118,95 @@ public final class PalettePresets {
     private static final int HYPIXEL_TOP_TIER_LEVEL = (VANILLA_TIER_RGB.length - 1) * TIER_WIDTH;
 
     /**
-     * SkyPrism's own thirteen bands, covering levels 480, 490, ... 600 in order.
+     * SkyPrism's own six bands, covering levels 480, 500, 520, 540, 560 and 580 in order.
      *
      * <p>These are the only colours in the shipped table that are not Hypixel's. They live
      * above 480 because that is the whole of the range Hypixel leaves uncoloured -- its last
      * tier is one dark red that every level from 480 to infinity shares -- and because
      * spending new hues below 480 is exactly what players objected to.</p>
      *
-     * <p><b>Hue.</b> An even sweep from 350 degrees down to 212, 11.5 degrees per band:
-     * rose, magenta, orchid, violet, periwinkle, cornflower, sky, cyan. That arc is roughly
-     * the 150 degrees of the wheel Hypixel never visits at a legible lightness, and it
-     * terminates at cyan because the next step round is green, which is level 120. 600 is
-     * also the default {@code chromaMinLevel}, so the top band and the shimmer's first level
-     * are one number rather than two free to drift apart.</p>
+     * <p><b>There is no arc of the wheel Hypixel leaves free. That premise is what broke
+     * this twice.</b> The version of this comment that shipped through 1.0.3 claimed the
+     * magenta-to-cyan run was "roughly the 150 degrees of the wheel Hypixel never visits at a
+     * legible lightness", and the sweep was drawn straight through it on that basis. It is
+     * false. The 13 tiers go all the way round: aqua at 200, dark aqua at 240, blue at 280,
+     * light purple at 320, dark purple at 360, and the interpolated half-bands in
+     * {@link #fineBrackets()} fill the gaps between them. A sweep ending at cyan ends on top
+     * of level 200.</p>
      *
-     * <p><b>Lightness alternates rather than rises</b>, between {@code L = 0.760} saturated
-     * and {@code L = 0.870} pale. This is Hypixel's own grammar -- white, yellow, green,
-     * DARK green, aqua, DARK aqua -- inverted, because SkyPrism cannot use the dark leg: it
-     * is precisely what makes the vanilla {@code 0xAA00AA} measure 2.85:1 against the chat
-     * ground. The alternation is load-bearing, not decorative. At 10-level spacing the hue
-     * step alone is far too small to separate neighbours: measured with {@link Oklab}, the
-     * same arc at one fixed lightness puts adjacent bands 0.018 apart, under the ~0.02 where
-     * two colours stop being tellable apart, while the alternating version measures 0.119 at
-     * its tightest -- and 0.109 of that is the lightness swap alone.</p>
+     * <p><b>What is actually true is that some arcs have more clearance than others</b>, and
+     * that is a number, not a hunch. Walking the whole hue circle at every lightness that
+     * clears the contrast bar, and measuring how far the best colour at each hue can get from
+     * the nearest of the 24 vanilla brackets below it:</p>
      *
-     * <p><b>Chroma</b> is {@code min(0.16, 95% of the in-gamut maximum for that L and hue)},
+     * <ul>
+     *   <li>170..225 degrees -- teal through cyan -- never gets past 0.080 to 0.093. This is
+     *       a wall, and it is the wall the old sweep terminated against.</li>
+     *   <li>50..70 degrees -- amber through orange -- never gets past 0.099, hemmed in by the
+     *       gold at 400 and the yellows at 80..100.</li>
+     *   <li>235..355 degrees -- azure, periwinkle, violet, orchid, magenta, rose -- holds
+     *       0.117 to 0.153 the whole way. That corridor is where these six live.</li>
+     * </ul>
+     *
+     * <p><b>Hue.</b> Five steps down the corridor from 23 degrees to 238, averaging 29
+     * degrees a band: salmon, rose, mauve, violet, periwinkle, azure. It opens on the hue the
+     * tier below it is already drawing -- 23 degrees against the level-440 red's 24 -- because
+     * 480's job is to lift the red corner out rather than jump away from it, and it stops at
+     * azure because the next step round is the cyan wall. The sweep travels far enough that
+     * even bands two apart, which share a lightness, are 44 to 64 degrees of hue apart; that is
+     * the room a 10-level cadence could not afford.</p>
+     *
+     * <p><b>Lightness and chroma alternate together</b>, pale-and-soft against
+     * saturated-and-strong: {@code L} runs 0.81, 0.75, 0.85, 0.74, 0.80, 0.72 with chroma
+     * riding along at 0.10, 0.17, 0.12, 0.16, 0.09, 0.15. This is Hypixel's own grammar --
+     * white, yellow, green, DARK green, aqua, DARK aqua -- inverted, because SkyPrism cannot
+     * use the dark leg: it is precisely what makes the vanilla {@code 0xAA00AA} measure
+     * 2.85:1 against the chat ground. The alternation is load-bearing, not decorative. Held
+     * at one flat lightness, this same arc puts its closest neighbours 0.042 apart; with the
+     * alternation the closest neighbours are 0.116.</p>
+     *
+     * <p><b>Chroma</b> is capped at {@code 95% of the in-gamut maximum for that L and hue},
      * the recipe {@link #SPECTRUM} documents: capping rather than chasing the gamut edge is
      * what stops a searing band landing next to a washed-out one, since the edge is a
      * different distance away at every hue.</p>
      *
-     * <p><b>The 480 cell is the whole change.</b> Vanilla's last three tiers escalate by
+     * <p><b>These six were solved for, not chosen.</b> A search over lightness, chroma and
+     * hue maximised the smallest Oklab distance from every band here to every other bracket
+     * in the whole table -- the other five bands and all 24 vanilla ones -- under hard
+     * constraints that hue advance in one direction in roughly even steps, that lightness
+     * alternate on a regular rhythm, and that every band clear 7.0:1 on a {@code #14151C}
+     * ground. It reaches <b>0.1142</b>, against 0.1222 for an unconstrained scatter of six
+     * legible colours that reads as no progression at all. The binding pairs are level 560
+     * against the greys at 0 and 20; the worst contrast is 7.38:1 at level 540.</p>
+     *
+     * <p><b>Why six and not seven.</b> A seventh band at 600 has to continue the sweep past
+     * azure into 200..240 degrees, where the best available colour is 0.0885 from something
+     * already in the table -- no better than the 0.0869 level-590 collision this change exists
+     * to remove. Doubling back the other way into orange reaches only 0.0980. The one
+     * colour with real room left, an olive around 110 degrees, would read as a stray after
+     * azure. So the table ends at 580 and {@link BracketTable} clamps: level 600, the default
+     * {@code chromaMinLevel}, draws that azure and the shimmer runs on top of it.</p>
+     *
+     * <p><b>The 480 cell is still the whole change.</b> Vanilla's last three tiers escalate by
      * going darker and dead-end on the least legible colour on the entire scale, 2.35:1. The
-     * rose here sits 0.14 in Oklab from the level-440 red the eye actually compares it
-     * against and 0.32 from the dark red an unmodded client draws in its place, so 480 reads
-     * as leaving the red corner rather than sinking further into it. Worst contrast anywhere
-     * on this half is 7.9:1 against a {@code #14151C} ground, against 2.85:1 for the vanilla
-     * half it sits on top of.</p>
+     * salmon here is that same red hue at {@code L = 0.813} instead of 0.682 and a third less
+     * chroma: 0.168 in Oklab from the level-440 red the eye actually compares it against, 0.259
+     * from the level-460 half-band directly below it, and 0.361 from the dark red an unmodded
+     * client draws in its place, so 480 reads as the scale climbing out of the red corner
+     * rather than sinking further into it. Worst contrast anywhere on this half is 7.38:1 against a
+     * {@code #14151C} ground, against 2.85:1 for the vanilla half it sits on top of.</p>
      *
      * <p>Literal hex rather than computed at class-init, for the same reasons as
      * {@link #SPECTRUM}: inspectable, copy-pasteable into a custom table, identical on every
      * JVM.</p>
      */
     private static final int[] SKYPRISM_BAND_RGB = {
-        0xFB83BF, // 480 rose
-        0xFDBDE9, // 490 pale rose
-        0xE68AE6, // 500 magenta
-        0xEBC3FD, // 510 pale orchid
-        0xC598FB, // 520 violet
-        0xD5CDFD, // 530 pale violet
-        0xA4A8FB, // 540 periwinkle
-        0xC4D3FD, // 550 pale periwinkle
-        0x82B3FB, // 560 cornflower
-        0xB2D9FD, // 570 pale sky
-        0x44BEFB, // 580 sky
-        0x96E1FD, // 590 pale cyan
-        0x27C6DF  // 600 cyan
+        0xFDA8A3, // 480 salmon           L 0.813  C 0.101  h  23
+        0xF87CC5, // 500 rose             L 0.749  C 0.172  h 346
+        0xF4B2FD, // 520 pale mauve       L 0.849  C 0.124  h 322
+        0xBC90FB, // 540 violet           L 0.737  C 0.156  h 302
+        0xA3BEFC, // 560 pale periwinkle  L 0.804  C 0.093  h 266
+        0x22B1F8  // 580 azure            L 0.722  C 0.152  h 238
     };
 
     /**
@@ -303,15 +351,25 @@ public final class PalettePresets {
     }
 
     /**
-     * The table a fresh install draws with: 37 brackets over levels 0..600.
+     * The table a fresh install draws with: 30 brackets on one 20-level cadence, 0..580.
      *
-     * <p>Two halves with different jobs. Levels 0..479 are
+     * <p>Two halves with different jobs but a single step size. Levels 0..479 are
      * {@link #fineBrackets()}'s bands byte for byte -- every 20 levels, sampled off
      * {@link #vanillaPlus()}, so an even band is a real Hypixel tier colour and an odd one
      * is the perceptual midpoint of two of them. Nothing below 480 is invented; that half is
-     * Hypixel's palette at double resolution and no more. Levels 480..600 are
-     * {@link #SKYPRISM_BAND_RGB}, thirteen bands 10 levels apart, which is the range Hypixel
-     * paints one flat dark red across.</p>
+     * Hypixel's palette at double resolution and no more. Levels 480..580 are
+     * {@link #SKYPRISM_BAND_RGB}, six bands on that same 20, which is the range Hypixel
+     * paints one flat dark red across. 580 is the last boundary rather than 600 because a
+     * seventh colour cannot be placed at that separation -- see {@link #SKYPRISM_BAND_RGB} --
+     * and {@link BracketTable} clamps, so 600 and everything above it draws the azure.</p>
+     *
+     * <p><b>Separation is measured across the whole table, not between neighbours.</b> Every
+     * pair of brackets that involves a SkyPrism colour is at least 0.1142 apart in Oklab, far
+     * pairs included; {@code PalettePresetsTest} asserts exactly that. Checking only adjacent
+     * brackets is what let 1.0.3 ship a level-590 that measured 0.0869 from the level-200
+     * aqua sitting nineteen rows above it. The vanilla-only pairs are inherited rather than
+     * chosen and hold a lower floor of 0.0844, at levels 80 and 100 -- both sampled straight
+     * off Hypixel's own green run.</p>
      *
      * <p>The legibility bar is deliberately split, and {@code PalettePresetsTest} enforces
      * both halves: every bracket clears 2.0:1 against a dark UI, and every bracket at or
@@ -320,7 +378,7 @@ public final class PalettePresets {
      * measuring 2.85:1, which cannot be lifted without abandoning the tier hexes this half
      * exists to preserve.</p>
      *
-     * <p>37 entries against a {@code MAX_TABLE_ENTRIES} of 64, so a user who opens the table
+     * <p>30 entries against a {@code MAX_TABLE_ENTRIES} of 64, so a user who opens the table
      * editor on the shipped default still has room to add rows.</p>
      *
      * @return the shipped default bracket table

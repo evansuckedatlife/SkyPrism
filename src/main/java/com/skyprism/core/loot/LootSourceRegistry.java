@@ -1,10 +1,13 @@
 package com.skyprism.core.loot;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * The seeded table of every {@link LootSource}: caption, shipped {@link RollPolicy}, gate, chat
@@ -84,6 +87,125 @@ public final class LootSourceRegistry {
         return info(source).gate().isOpen(ctx);
     }
 
+    /**
+     * Everything {@code source} can actually pay -- the celebrated drops and the ordinary ones --
+     * sorted case-insensitively.
+     *
+     * <h2>Why this is not simply {@code info(source).jackpotItems()}</h2>
+     *
+     * <p>A player reported never once seeing the Chimera book scroll past during an Inquisitor
+     * roll. The reason turned out to be that one list was being asked to answer two different
+     * questions. {@link LootSourceInfo#jackpotItems()} is the <em>celebration</em> set: the drops
+     * worth stopping three reels on, and the set {@code LootMachine} promotes an ordinary drop into
+     * a rare one by. {@code JackpotRule} says out loud what that job excludes -- "Deliberately
+     * excluded: Griffin Feather (66% of all treasure), Coins, Mythos Fragment, Ancient Claw ...
+     * Celebrating those would make the flourish meaningless" -- and it is right about celebration
+     * and wrong about the reel, because the reel is what tells you which machine you are looking
+     * at, and the Griffin Feather and the Ancient Claw are the two most recognisable things Diana
+     * pays. Widening the celebration set to fix the reel would have made every Inquisitor kill a
+     * jackpot; narrowing the reel to the celebration set is what deleted the recognisable drops
+     * from it. So there are two lists.
+     *
+     * <p>What goes in the second one, {@link #ORDINARY}: real loot off the same wiki table, common
+     * enough that a flourish for it would be a lie. Nothing invented, and nothing that belongs to
+     * another source -- the rule that a strip may only carry its own source's loot is unchanged and
+     * still tested; this only widens what "its own" means from "worth celebrating" to "actually
+     * drops".
+     *
+     * @param source the source rolling
+     * @return its full drop table, distinct and in a stable order; never null
+     */
+    public static List<String> dropPool(LootSource source) {
+        LootSourceInfo entry = info(source);
+        Set<String> pool = new LinkedHashSet<>(entry.jackpotItems());
+        pool.addAll(ORDINARY.getOrDefault(source, List.of()));
+        List<String> sorted = new ArrayList<>(pool);
+        // Sorted, and not merely deduplicated, because jackpotItems() is frozen with Set.copyOf,
+        // whose iteration order is randomised per JVM: without this the reel drum would be
+        // arranged differently in every session and no test could pin what is on it.
+        sorted.sort(String.CASE_INSENSITIVE_ORDER);
+        return List.copyOf(sorted);
+    }
+
+    /** The ordinary half of every drop pool; see {@link #dropPool}. */
+    private static final Map<LootSource, List<String>> ORDINARY = ordinaryDrops();
+
+    /**
+     * The frequent, uncelebrated drops, per source.
+     *
+     * <p>Same standard of evidence as the jackpot lists above: every name here is on
+     * <a href="https://hypixelskyblock.minecraft.wiki">hypixelskyblock.minecraft.wiki</a>'s table
+     * for that fight, and every one of them resolves to a real SkyBlock item in
+     * {@code skyblock_item_names.tsv} and to a sprite of its own in {@code drop_symbols.json} --
+     * both enforced, so an invented name here fails the build exactly as one in a jackpot list
+     * does. A source is absent from this map when nobody has confronted its table with the wiki;
+     * absent is the honest answer and it costs nothing, because the strip tops itself up from
+     * generic enchanted material.
+     */
+    private static Map<LootSource, List<String>> ordinaryDrops() {
+        Map<LootSource, List<String>> map = new EnumMap<>(LootSource.class);
+
+        // Griffin burrow treasure and the shared creature pool. Every mythological creature pays
+        // the claws and the ingot, the Inquisitor pays 16-32 claws at 100%, and the feather is
+        // about two thirds of all burrow treasure -- which is exactly why JackpotRule refuses to
+        // celebrate them and exactly why the drum has to show them.
+        map.put(LootSource.DIANA_MYTHOLOGICAL, List.of(
+                "Griffin Feather", "Mythos Fragment", "Coins", "Ancient Claw",
+                "Enchanted Ancient Claw", "Enchanted Gold Ingot"));
+
+        // The six slayers' common drops. "Enchanted Book" is on every one of the six tables and is
+        // deliberately here rather than in the celebration set: Hypixel prints the ITEM in the
+        // banner and keeps the enchantment in the item's lore, so a real Chimera, Smite VI or
+        // Critical VI arrives in chat as the words "Enchanted Book" and nothing else.
+        map.put(LootSource.SLAYER_BOSS, List.of(
+                "Enchanted Book",
+                // Voidgloom Seraph
+                "Null Sphere", "Twilight Arrow Poison",
+                // Revenant Horror
+                "Revenant Viscera", "Festering Maggot",
+                // Tarantula Broodfather
+                "Tarantula Silk", "Digested Mosquito", "Vial of Venom",
+                // Sven Packmaster
+                "Grizzly Salmon", "Furball", "Wolf Tooth",
+                // Inferno Demonlord
+                "Scorched Books", "Bundle of Magma Arrows",
+                "Wisp's Ice-Flavored Water I Splash Potion", "Blaze Rod Distillate",
+                "Glowstone Distillate", "Magma Cream Distillate", "Nether Wart Distillate",
+                "Gabagool Distillate", "Flawed Opal Gemstone",
+                // Riftstalker Bloodfiend
+                "Unfanged Vampire Part", "Coven Seal"));
+
+        // The Reindrake's guaranteed drop is an Enchanted Book (Prosperity I), which chat prints
+        // as "Enchanted Book" for the same reason the slayers' books do.
+        map.put(LootSource.REINDRAKE, List.of("Enchanted Book"));
+
+        // The Vanquisher's whole table is three Nether Stars and, once in a quarter of a
+        // million kills, the Cyclamen Dye above.
+        map.put(LootSource.VANQUISHER, List.of("Nether Star"));
+
+        // The Headless Horseman pays Spooky Fragments to everyone who hit it and candy to the
+        // damage leaders; the Midnight Dye above is the RNGesus drop.
+        map.put(LootSource.HEADLESS_HORSEMAN, List.of(
+                "Spooky Fragment", "Green Candy", "Purple Candy"));
+
+        // A nucleus run pays one of every Flawless gemstone often enough that a strip listing only
+        // two of the seven reads as a different activity than the one you just spent an hour on.
+        map.put(LootSource.CRYSTAL_NUCLEUS_RUN, List.of(
+                "Flawless Ruby Gemstone", "Flawless Amethyst Gemstone", "Flawless Sapphire Gemstone",
+                "Flawless Topaz Gemstone", "Flawless Jasper Gemstone"));
+
+        // The frozen corpses. The eight already listed are the Vanguard tier's signature loot; the
+        // gemstones and the scrap below are what the Lapis, Umber and Tungsten corpses mostly pay,
+        // which is what most corpse openings actually are.
+        map.put(LootSource.GLACITE_CORPSE, List.of(
+                "Fine Peridot Gemstone", "Flawless Peridot Gemstone", "Fine Citrine Gemstone",
+                "Flawless Citrine Gemstone", "Fine Aquamarine Gemstone",
+                "Flawless Aquamarine Gemstone", "Suspicious Scrap", "Blue Goblin Egg",
+                "Frostbitten Dye"));
+
+        return Map.copyOf(map);
+    }
+
     private static Map<LootSource, LootSourceInfo> build() {
         Map<LootSource, LootSourceInfo> map = new EnumMap<>(LootSource.class);
         for (LootSourceInfo info : entries()) {
@@ -113,7 +235,8 @@ public final class LootSourceRegistry {
                                 "Shimmering Wool", "Manti-core", "Washed-up Souvenir", "Cretan Urn",
                                 "Hilt of Revelations", "Brain Food", "Antique Remedies",
                                 "Dwarf Turtle Shelmet", "Fateful Stinger", "Chimera I",
-                                "Crown of Greed")
+                                "Crown of Greed", "Minos Hunter Shard", "Cretan Bull Shard",
+                                "Harpy Shard", "Minotaur Shard", "Sphinx Shard", "King Minos Shard")
                         .note("The shipped path and the only one verified on the live server. The roll "
                                 + "fires on the bound creature being defeated, which is an entity "
                                 + "event with no chat line; the treasure-dig lines above are loot, "
@@ -131,14 +254,33 @@ public final class LootSourceRegistry {
                         .samples(
                                 "  §r§6§lNICE! SLAYER BOSS SLAIN!",
                                 "  §r§a§lSLAYER QUEST COMPLETE!")
-                        .jackpot("Judgement Core", "Enchant Rune I", "Void Conqueror Enderman Skin",
-                                "Handy Blood Chalice", "Etherwarp Merger", "Sinful Dice",
-                                "Pocket Espresso Machine", "Warden Heart", "Scythe Blade",
-                                "Shredded Sinew", "Severed Hand", "Beheaded Horror", "Snake Rune I",
+                        .jackpot(
+                                // Voidgloom Seraph
+                                "Judgement Core", "Enchant Rune I", "Void Conqueror Enderman Skin",
+                                "Etherwarp Merger", "Sinful Dice", "Pocket Espresso Machine",
+                                "Hazmat Enderman", "Byzantium Dye", "Transmission Tuner",
+                                "Endersnake Rune I", "End Rune I", "End Stone Idol", "Null Atom",
+                                "Exceedingly Rare Ender Artifact Upgrade",
+                                // Revenant Horror
+                                "Warden Heart", "Scythe Blade", "Shredded Sinew", "Severed Hand",
+                                "Beheaded Horror", "Snake Rune I", "Matcha Dye", "Undead Catalyst",
+                                // Tarantula Broodfather
+                                "Brick Red Dye", "Tarantula Talisman", "Fly Swatter", "Bite Rune I",
+                                "Spider Catalyst", "Tarantula Catalyst", "Paragon Shard",
+                                "Darkness Within Rune I",
+                                // Sven Packmaster
+                                "Celeste Dye", "Spirit Rune I", "Couture Rune I",
+                                "Overflux Capacitor", "Red Claw Egg", "Hamster Wheel",
+                                // Inferno Demonlord
                                 "Wilson's Engineering Plans", "Subzero Inverter",
-                                "High Class Archfiend Dice", "Fiery Burst Rune I", "Byzantium Dye",
-                                "Matcha Dye", "Brick Red Dye", "Celeste Dye", "Flame Dye",
-                                "Hazmat Enderman")
+                                "High Class Archfiend Dice", "Fiery Burst Rune I", "Flame Dye",
+                                "Archfiend Dice", "Scorched Power Crystal",
+                                "Inferno Demonlord Shard", "Lavatears Rune I", "Kelvin Inverter",
+                                "Mana Disintegrator",
+                                // Riftstalker Bloodfiend
+                                "Handy Blood Chalice", "Sangria Dye", "Guardian Lucky Block",
+                                "Soultwist Rune I", "Bubba Blister", "Fang-tastic Chocolate Chip",
+                                "McGrubber's Burger")
                         .note("The closest analogue to the shipped Diana behaviour: a deliberate, "
                                 + "discrete kill the player is waiting on, at Diana's own cadence. "
                                 + "ON_RARE_BANNER would gut it, because the whole point of a slayer "
@@ -311,6 +453,7 @@ public final class LootSourceRegistry {
                         .samples(
                                 "A Vanquisher is spawning nearby!",
                                 "§6§lRARE DROP! §r§9Vanquisher Loot §r§b(+123% ✯ Magic Find)")
+                        .jackpot("Cyclamen Dye")
                         .note("No kill line could be verified -- the reference mod uses entity "
                                 + "despawn instead, which is strong evidence none exists. Rolling on "
                                 + "the spawn broadcast would be wrong: it fires for everyone in the "
@@ -453,6 +596,7 @@ public final class LootSourceRegistry {
                         .rareBanner()
                         .markers("DROP!")
                         .samples("§6§lRARE DROP! §r§9Horseman's Horse §r§b(+123% ✯ Magic Find)")
+                        .jackpot("Midnight Dye")
                         .note("Listed for completeness only. Neither reference mod carries a spawn or "
                                 + "kill line for it -- it is known solely as a damage-indicator boss "
                                 + "type -- so no trigger regex was written. The universal banner is "
@@ -633,7 +777,7 @@ public final class LootSourceRegistry {
                                 "§7Pick it up near the §r§5Nucleus Vault§r§7!",
                                 "§f    §r§5§l✦ CRYSTAL FOUND §r§7(1§r§7/5§r§7)")
                         .jackpot("Divan's Alloy", "Quick Claw", "Jaderald", "Helix Fossil",
-                                "Flawless Jade Gemstone", "Flawless Amber Gemstone")
+                                "Flawless Jade Gemstone", "Flawless Amber Gemstone", "Jade Dye")
                         .note("A full run is thirty to sixty minutes and happens at most twice an "
                                 + "hour; nothing in the game deserves the machine more. Roll on the "
                                 + "completion only -- the five CRYSTAL FOUND lines are progress "
@@ -811,7 +955,8 @@ public final class LootSourceRegistry {
                                 "§9You hear a massive rumble as Thunder emerges.")
                         .jackpot("Titanoboa Shed", "Radioactive Vial", "Magma Lord Fragment",
                                 "Flying Fish", "Thunder Fragment", "Silver Magmafish",
-                                "Lord Jawbus Shard", "Emperor's Skull", "Squid Boots", "Carmine Dye")
+                                "Lord Jawbus Shard", "Emperor's Skull", "Squid Boots", "Carmine Dye",
+                                "Bobbin' Scriptures")
                         .note("Seven of the ten entries were replaced. \"Lord Jawbus\" and "
                                 + "\"Thunder\" are the CREATURES, not loot -- they now appear as the "
                                 + "things those two actually pay -- and \"Reindrake Fragment\", "

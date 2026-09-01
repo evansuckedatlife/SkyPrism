@@ -23,23 +23,37 @@ import java.util.Optional;
  * drops had arrived by that reel's lock instant, never on whether anyone called {@link #reels()} in
  * between.
  *
- * <h2>Timeline: two acts</h2>
- * <p><b>Act one always plays, and always plays the same way.</b> Reel {@code i} locks at
+ * <h2>Timeline: two acts, and one continuous spin</h2>
+ * <p><b>An ordinary roll always plays the same way.</b> Reel {@code i} locks at
  * {@code start + spinMillis + i * lockStaggerMillis} on the drops the kill actually produced. Once
- * the last reel locks the result holds for {@code settleMillis}. Nothing about the loot changes
- * those instants -- in particular a rare drop does not extend them, does not tint anything, and is
- * not observable in act one at all beyond appearing on a reel like any other item. A roll that
- * announced its jackpot from the first frame would have spent the surprise before the reels had
- * said anything.
+ * the last reel locks the result holds for {@code settleMillis} and then fades. Nothing about
+ * ordinary loot changes those instants.
  *
- * <p><b>Act two plays only after act one has finished, and only when a jackpot was captured.</b>
+ * <p><b>A roll that captured a jackpot never comes to a stop before its celebration.</b> Act two
+ * begins at {@link #jackpotActStartAt(long)}, which is the first reel's ordinary lock instant --
+ * so the reels reach the moment they would have stopped and keep going instead. From there
  * {@link RollState#JACKPOT_INTRO} washes gold in ({@link #jackpotIntroProgress()} running 0 to 1)
- * while the reels are already breaking loose underneath it, so the colour and the motion arrive
- * together; the wash completes and the reels keep turning
+ * over columns that have never stopped turning; the wash completes and they keep turning
  * ({@link RollState#JACKPOT_SPIN}); then they land one at a time, left to right, every one of them
  * on {@link #jackpotSymbol()} ({@link RollState#JACKPOT_LOCK}); then the three of a kind holds
- * ({@link RollState#JACKPOT_HOLD}) before the fade. With no jackpot the roll steps from
- * {@link RollState#SETTLED} straight to {@link RollState#FADING} as it always did.
+ * ({@link RollState#JACKPOT_HOLD}) before the fade. The whole roll is therefore one movement --
+ * spin, gold, spin, land -- with exactly one stop in it, at the end, where a slot machine's stop
+ * belongs.
+ *
+ * <p><b>Why act two used to start later, and why that was the bug.</b> It began at the end of the
+ * settle, which meant a lucky roll locked its three reels, held them dead still for the whole
+ * settle, and only then broke them loose again: a stop and a restart, plainly visible, in the
+ * middle of the one animation that is supposed to build. The reading act one bought -- the real
+ * loot on the reels before the flourish converged them -- was not worth a three-second stall, so
+ * it is gone: on a celebrating roll the reels no longer land in act one at all, and the real loot
+ * stays available through {@link #capturedDrops()} for the caption.
+ *
+ * <p><b>A banner that arrives late still cuts the stall short rather than waiting it out.</b>
+ * Hypixel prints the rare-drop line a beat after the ordinary ones, and if it lands after some
+ * columns have already locked, act two opens on the spot -- at the banner rather than at the end
+ * of the settle. Those columns unlock and rejoin the spin, which is the shortest stop the timing
+ * allows. With no jackpot the roll steps from {@link RollState#SETTLED} straight to
+ * {@link RollState#FADING} as it always did.
  *
  * <h2>Symbol policy (act one)</h2>
  * <p>Captured drops are ranked <i>most interesting first</i>: jackpot drops before ordinary ones,
@@ -67,7 +81,8 @@ import java.util.Optional;
  *   <li><b>Captured strictly before the settle ends -- the sequence fires.</b> That deliberately
  *       includes a banner arriving after every reel has locked, while the result is being held:
  *       {@code lootWindowMillis} is allowed to outlast the locks precisely because Hypixel prints
- *       the banner a beat late, and act two has not started yet, so there is nothing to disturb.</li>
+ *       the banner a beat late. Those columns then unlock and rejoin the spin, which is a stop of
+ *       whatever length the banner was late by rather than the full settle.</li>
  *   <li><b>Captured once the fade has begun -- it does not.</b> Act two would have to start from
  *       {@link RollState#FADING}, stepping the roll back to {@link RollState#JACKPOT_INTRO}: on
  *       screen, a half-faded panel snapping back to full opacity and re-spinning. The drop is still
@@ -123,6 +138,13 @@ public final class SlotRoll {
 
     /** Sentinel for "no jackpot captured in this roll". */
     private static final long NO_JACKPOT = Long.MIN_VALUE;
+
+    /**
+     * What {@link #jackpotActStartAt(long)} answers when this roll has no celebration coming: an
+     * instant no clock reading can reach, so {@code now >= actTwoStart} is false for every frame.
+     * Deliberately the same value as {@link ReelScroll#NEVER}, which is where it is normally fed.
+     */
+    public static final long NO_ACT_TWO = Long.MAX_VALUE;
 
     private final SlotRollConfig config;
     private final Clock clock;
@@ -347,6 +369,27 @@ public final class SlotRoll {
         if (!running) {
             return RollState.IDLE;
         }
+        // Act two is asked about first, and the act-one ladder below is reached only while act two
+        // has not opened yet. Ordering it the other way round -- act one's ladder first, act two as
+        // its tail -- is what made the stall structural: LOCKING and SETTLED were returned for
+        // instants that now belong to the celebration, and reelsAt would have disagreed with this
+        // method about them. See ReviewFindingsTest.noDesync for the assertion that catches exactly
+        // that split.
+        if (celebrating() && now >= actTwoStartMillis()) {
+            if (now < jackpotSpinStartMillis()) {
+                return RollState.JACKPOT_INTRO;
+            }
+            if (now < jackpotLockMillis(0)) {
+                return RollState.JACKPOT_SPIN;
+            }
+            if (now < jackpotLockMillis(config.reelCount() - 1)) {
+                return RollState.JACKPOT_LOCK;
+            }
+            if (now < jackpotHoldEndMillis()) {
+                return RollState.JACKPOT_HOLD;
+            }
+            return RollState.FADING;
+        }
         if (now < lockMillis(0)) {
             return RollState.SPINNING;
         }
@@ -356,22 +399,9 @@ public final class SlotRoll {
         if (now < settleEndMillis()) {
             return RollState.SETTLED;
         }
-        if (!celebrating()) {
-            // The sweep above already turned a finished roll idle, so the only phase left is the fade.
-            return RollState.FADING;
-        }
-        if (now < jackpotSpinStartMillis()) {
-            return RollState.JACKPOT_INTRO;
-        }
-        if (now < jackpotLockMillis(0)) {
-            return RollState.JACKPOT_SPIN;
-        }
-        if (now < jackpotLockMillis(config.reelCount() - 1)) {
-            return RollState.JACKPOT_LOCK;
-        }
-        if (now < jackpotHoldEndMillis()) {
-            return RollState.JACKPOT_HOLD;
-        }
+        // The sweep above already turned a finished roll idle, so the only phase left is the fade.
+        // Only an ordinary roll gets here: a celebrating one has an act-two start no later than the
+        // settle's end, so every instant past the settle went through the branch above.
         return RollState.FADING;
     }
 
@@ -408,10 +438,11 @@ public final class SlotRoll {
      * already unlocked and turning. See {@link Reel} for why {@code locked}, not {@code symbol}, is
      * the flag a renderer should branch on.
      *
-     * <p>The reels deliberately break loose at the same moment the gold begins to arrive rather than
-     * waiting for it to finish. The wash and the spin-up overlap, so act two opens on a machine that
-     * is already moving as it turns gold, instead of a still picture that changes colour and only
-     * afterwards starts to roll.
+     * <p>On a celebrating roll act one's locks are unreachable: act two opens at the instant the
+     * first column would have stopped, so the branch below that locks a reel on the real loot is
+     * only ever taken by an ordinary roll, or by a roll whose banner arrived after some columns had
+     * already landed. Nothing in here stops a turning column and starts it again -- the gold
+     * arrives over reels that are still moving, and the only landing in a lucky roll is act two's.
      *
      * @param now a reading of this roll's clock
      * @return {@code reelCount} reels while a roll is running, or an empty list when idle
@@ -426,8 +457,11 @@ public final class SlotRoll {
         // Act two's motion starts the instant act two does, not when the gold has finished arriving:
         // the reels are already turning underneath the wash. Gating this on jackpotSpinStartMillis()
         // instead held every column still for the whole of JACKPOT_INTRO, which read as the machine
-        // pausing to change colour and only then deciding to spin.
-        if (celebrating() && now >= settleEndMillis()) {
+        // pausing to change colour and only then deciding to spin. The gate is actTwoStartMillis()
+        // rather than settleEndMillis() for the same reason one act further out: measured from the
+        // settle, every celebrating roll stopped dead for the whole of it before this branch could
+        // ever be taken.
+        if (celebrating() && now >= actTwoStartMillis()) {
             LootDrop symbol = frozenJackpotSymbol();
             for (int i = 0; i < count; i++) {
                 boolean locked = now >= jackpotLockMillis(i);
@@ -513,7 +547,7 @@ public final class SlotRoll {
         if (!running || !celebrating()) {
             return 0.0d;
         }
-        long begin = settleEndMillis();
+        long begin = actTwoStartMillis();
         if (now <= begin) {
             return 0.0d;
         }
@@ -528,6 +562,45 @@ public final class SlotRoll {
             return 1.0d;
         }
         return (double) elapsed / duration;
+    }
+
+    /**
+     * The instant the roll running at {@code now} began, or {@code now} itself when idle.
+     *
+     * <p>Published for one reason: a renderer that integrates a scroll rate over the roll needs an
+     * origin, and the only honest origin is the roll's own start. Deriving one from the wall clock
+     * instead -- dividing {@code System.currentTimeMillis()} by a cell period, which is what the
+     * HUD used to do -- makes which symbols a short spin shows a function of what the clock happened
+     * to read, so an entry can be missing from one roll and present in the next for no visible
+     * reason. Answering {@code now} rather than zero when idle means a caller that integrates from
+     * it reads a travelled distance of zero rather than of several decades.
+     *
+     * @param now a reading of this roll's clock
+     * @return the roll's start instant, or {@code now} when nothing is running
+     */
+    public long rollStartAt(long now) {
+        sweepAt(now);
+        return running ? startMillis : now;
+    }
+
+    /**
+     * The instant act two opens for the roll running at {@code now}, or {@link #NO_ACT_TWO} when
+     * this roll has no celebration coming.
+     *
+     * <p>This is the boundary the whole seamless sequence turns on, and it is published rather than
+     * left private because presentation needs it: the scroll accelerates here, and an effect that
+     * has to accelerate <em>at</em> a boundary cannot be driven by having noticed the boundary a
+     * frame later. A renderer feeds this straight to
+     * {@link ReelScroll#cellsTravelled(long, long, long, long, long)}, whose {@link ReelScroll#NEVER}
+     * is deliberately the same value as {@link #NO_ACT_TWO} so the no-celebration case needs no
+     * branch at the call site.
+     *
+     * @param now a reading of this roll's clock
+     * @return the act-two start instant, or {@link #NO_ACT_TWO}
+     */
+    public long jackpotActStartAt(long now) {
+        sweepAt(now);
+        return running && celebrating() ? actTwoStartMillis() : NO_ACT_TWO;
     }
 
     /** The single drop all reels converge on in act two, at the current instant. */
@@ -675,24 +748,49 @@ public final class SlotRoll {
     }
 
     /**
-     * When act one's settle ends: either the roll starts fading, or act two begins here.
+     * When an ordinary roll's settle ends and it starts fading.
      *
-     * <p>Nothing extends it. The bonus that used to be spent here when a banner arrived too late to
-     * lengthen the spin is gone, because the whole celebration now lives after this instant and a
-     * late banner therefore gets a full sequence rather than a consolation prize.
+     * <p>Still the arming cutoff for {@link #celebrating()}, and no longer the origin of act two.
+     * Those were one instant playing two roles, and the second role is what produced the stall: a
+     * celebration measured from here could not begin until act one had locked every column and held
+     * them for the whole settle. {@link #actTwoStartMillis()} is the origin now; this stays exactly
+     * where it was, because "a rare captured strictly before the settle ends earns the sequence" is
+     * a rule about lateness that must not become self-referential.
      */
     private long settleEndMillis() {
         return addClamped(lockMillis(config.reelCount() - 1), config.settleMillis());
     }
 
-    /** When act two's reels start moving again, after the gold wash. */
+    /**
+     * When act two opens: the first column's ordinary lock instant, or the banner if it was late.
+     *
+     * <p>The first lock is the earliest instant the celebration can start without cutting the
+     * ordinary spin short -- the reels have to have been turning for a beat before anything can be
+     * said to interrupt them -- and it is the latest instant it can start without a visible stop,
+     * because it is exactly where the columns would otherwise have begun to land. Taking the later
+     * of it and the banner is what handles Hypixel printing the rare-drop line after the ordinary
+     * ones: a banner during the spin gets the full seamless sequence, and one arriving after some
+     * columns have already locked opens act two on the spot rather than waiting out the settle,
+     * which is the shortest stop the timing allows.
+     *
+     * <p>Only meaningful while {@link #celebrating()}, which is what bounds it: that guarantees a
+     * capture strictly before {@link #settleEndMillis()}, so the answer always lies in
+     * {@code [lockMillis(0), settleEndMillis()]} and the act-one ladder in {@link #stateAt(long)}
+     * can never be reached past it.
+     */
+    private long actTwoStartMillis() {
+        long earliest = lockMillis(0);
+        return jackpotMillis > earliest ? jackpotMillis : earliest;
+    }
+
+    /** When act two's gold has finished washing in; the reels have been turning throughout. */
     private long jackpotSpinStartMillis() {
-        return addClamped(settleEndMillis(), config.jackpotSpinStartOffset());
+        return addClamped(actTwoStartMillis(), config.jackpotSpinStartOffset());
     }
 
     /** When reel {@code i} lands on the jackpot symbol, staggered left to right. */
     private long jackpotLockMillis(int reelIndex) {
-        return addClamped(settleEndMillis(), config.jackpotLockOffset(reelIndex));
+        return addClamped(actTwoStartMillis(), config.jackpotLockOffset(reelIndex));
     }
 
     /** When the three of a kind stops being held and the fade begins. */
@@ -700,9 +798,23 @@ public final class SlotRoll {
         return addClamped(jackpotLockMillis(config.reelCount() - 1), config.jackpotHoldMillis());
     }
 
-    /** When the roll goes idle: the fade measured from the end of whichever act finished last. */
+    /**
+     * When the roll goes idle: the fade measured from the end of whichever act finished last.
+     *
+     * <p>A celebrating roll takes the later of its own end and the ordinary one. Act two now starts
+     * early enough that a celebration configured shorter than the settle it replaced would finish
+     * before an ordinary roll of the same length would have, and a lucky kill must never be
+     * <em>briefer</em> than an unlucky one -- that would yank the result off the screen as a reward
+     * for the rare drop.
+     */
     private long fadeEndMillis() {
-        long lastVisible = celebrating() ? jackpotHoldEndMillis() : settleEndMillis();
+        long lastVisible = settleEndMillis();
+        if (celebrating()) {
+            long celebrationEnd = jackpotHoldEndMillis();
+            if (celebrationEnd > lastVisible) {
+                lastVisible = celebrationEnd;
+            }
+        }
         return addClamped(lastVisible, config.fadeMillis());
     }
 
@@ -716,17 +828,22 @@ public final class SlotRoll {
      * {@code lootWindowMillis} long enough to still be open during the celebration would otherwise
      * let a late banner rewrite reels the player is watching land.
      *
-     * <p>Only called while {@link #celebrating()}, which guarantees a rare captured strictly before
+     * <p>The cutoff is inclusive, and has to be. Act two starts no earlier than the banner that
+     * armed it, and on the late-banner path it starts <em>on</em> that banner, so a strict
+     * comparison would exclude the very drop the celebration exists for and converge three columns
+     * on the fallback.
+     *
+     * <p>Only called while {@link #celebrating()}, which guarantees a rare captured no later than
      * the cutoff, so the fallback is unreachable; it returns {@link #NO_DROP} rather than null
      * because {@link Reel} forbids a locked reel without a symbol and a crash in a render loop is
      * worse than a wrong picture.
      */
     private LootDrop frozenJackpotSymbol() {
         ensureRanked();
-        long cutoff = settleEndMillis();
+        long cutoff = actTwoStartMillis();
         for (int i = 0; i < ranked.size(); i++) {
             Capture candidate = ranked.get(i);
-            if (candidate.drop().rare() && candidate.atMillis() < cutoff) {
+            if (candidate.drop().rare() && candidate.atMillis() <= cutoff) {
                 return candidate.drop();
             }
         }

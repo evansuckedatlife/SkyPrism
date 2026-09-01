@@ -360,21 +360,22 @@ final class ReviewFindingsTest {
             assertEquals("Coins", before.get(0).itemName());
             assertEquals("Ancient Claw", before.get(1).itemName());
 
-            // A rare drop arriving later must overtake both on the reels that had not yet locked --
-            // and, because these all locked already, must at least not corrupt the memoised order.
+            // A rare drop arriving later must overtake the 25k stack in the memoised ranking. Where
+            // that is now observable is the celebration rather than a column: a banner captured
+            // during the spin opens act two at the first lock instant, so by 1800 every reel is
+            // chasing the prize and none of them ever landed on the ordinary loot.
             clock.set(0L);
             SlotRoll second = new SlotRoll(CFG, clock);
             second.start(MythologicalCreature.MINOS_INQUISITOR);
             second.offerDrop(new LootDrop("Coins", "6", 25_000, false));
             clock.set(500L);
             second.offerDrop(new LootDrop("Daedalus Stick", "5", 1, true));
-            // The jackpot arrived before every reel had locked, so it takes the leftmost column --
-            // but it buys no extra spin time, so the locks stay at 1000 / 1200 / 1400 and 1800 is
-            // simply somewhere in the settle.
             clock.set(1800L);
+            assertEquals("Daedalus Stick", second.jackpotSymbolAt(1800L).itemName(),
+                    "rare beats a 25,000 stack, memo or no memo");
             List<LootDrop> after = second.reelsAt(1800L).stream().map(Reel::symbol).toList();
             assertEquals("Daedalus Stick", after.get(0).itemName());
-            assertEquals("Coins", after.get(1).itemName());
+            assertEquals("Daedalus Stick", after.get(1).itemName());
         }
 
         /** A reel that locked before a drop arrived must never show it, memo or no memo. */
@@ -387,10 +388,13 @@ final class ReviewFindingsTest {
             roll.offerDrop(new LootDrop("Griffin Feather", "9", 1, false));
 
             clock.set(1300L); // reels 0 and 1 locked; reel 2 has not
-            roll.offerDrop(new LootDrop("Crown of Greed", "5", 1, true));
+            // Deliberately an ordinary drop. A rare one would open the celebration on the spot and
+            // unlock all three columns, which is a different (and separately tested) property; what
+            // is under test here is that a reel which locked at 1000 cannot see a line from 1300.
+            roll.offerDrop(new LootDrop("Crown of Greed", "5", 1, false));
 
             // Reel 2 locks at 1400 on its own schedule and is the only one that can have seen the
-            // banner; 1800 is well inside the settle, where all three are readable.
+            // line; 1800 is well inside the settle, where all three are readable.
             clock.set(1800L);
             List<Reel> reels = roll.reelsAt(1800L);
             assertEquals("Griffin Feather", reels.get(0).symbol().itemName());

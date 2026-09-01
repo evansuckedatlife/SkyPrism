@@ -258,10 +258,10 @@ Collapsed by default in the screen. All values are milliseconds.
 | Reels | `diana.reelCount` | `3` | 1–5 | Columns on the machine. |
 | Loot window | `diana.lootWindowMillis` | `3000` | 250–30,000 | How long after a kill drops are still attributed to it. Under a quarter second the ordinary drop lines that follow a kill fall outside it and the reels lock onto nothing; past thirty seconds the next kill's drops start bleeding in. |
 | Spin length | `diana.spinMillis` | `1200` | 0–10,000 | Free-spin time before the leftmost reel locks. |
-| Lock stagger | `diana.lockStaggerMillis` | `250` | 0–2,000 | Extra delay per reel, so they stop left to right. |
-| Hold after settling | `diana.settleMillis` | `2500` | 0–15,000 | How long the finished result is held still. |
+| Lock stagger | `diana.lockStaggerMillis` | `250` | 0–2,000 | Extra delay per reel, so they stop left to right. Skipped entirely on a roll that captured a rare drop: it goes to the celebration at the first lock instant instead of landing. |
+| Hold after settling | `diana.settleMillis` | `2500` | 0–15,000 | How long the finished result is held still. Ordinary rolls only — a jackpot roll never settles, it rolls on into the celebration. It is still the deadline a late rare-drop banner has to beat to earn one. |
 | Fade out | `diana.fadeMillis` | `500` | 0–5,000 | How long the result takes to fade afterwards. |
-| Jackpot gold wash | `diana.jackpotIntroMillis` | `600` | 0–5,000 | How long the gold takes to wash in. Every reel breaks loose at the *start* of it, so this measures the colour ramp rather than a pause before the machine moves. 0 makes the gold snap on. |
+| Jackpot gold wash | `diana.jackpotIntroMillis` | `600` | 0–5,000 | How long the gold takes to wash in. The reels are already turning underneath it — they never stopped — so this measures the colour ramp rather than a pause before the machine moves. 0 makes the gold snap on. |
 | Jackpot re-spin | `diana.jackpotSpinMillis` | `900` | 0–10,000 | How much longer the reels keep turning once the wash is complete, before the first one lands. |
 | Jackpot lock stagger | `diana.jackpotLockStaggerMillis` | `280` | 0–2,000 | Delay per reel in the second act, so the three of a kind lands column by column. 0 lands them together. |
 | Jackpot hold | `diana.jackpotHoldMillis` | `2200` | 0–15,000 | How long the three of a kind is held before the fade. |

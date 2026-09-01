@@ -123,8 +123,7 @@ scratch path and will not be right on your machine.
 | `05-slot-spinning.png` | the slot machine mid-spin |
 | `06-slot-one-reel-locked.png` | one reel locked |
 | `07-slot-all-reels-locked.png` | all reels locked on the real drops, as item sprites with their names beneath |
-| `08-jackpot-act-one-spinning.png` | a roll that *will* pay out, still spinning — indistinguishable from an ordinary one, which is the point |
-| `09-jackpot-settled-no-gold.png` | the same roll settled on its real drops, with no gold anywhere. The step behind it asserts `jackpot()` is true while `inJackpotSequence()` is false and `jackpotIntroProgress()` is exactly 0 |
+| `08-jackpot-act-one-spinning.png` | a roll that *will* pay out, still spinning — indistinguishable from an ordinary one, which is the point. The step behind it asserts `jackpot()` is true while `inJackpotSequence()` is false and `jackpotIntroProgress()` is exactly 0, **and that no column has landed**. There used to be a second act-one frame here, `09-jackpot-settled-no-gold.png`, taken after every reel had locked and held; it was a photograph of the stall between the two acts, and a jackpot roll now never reaches `SETTLED` nor lands a column before the prize does, so the frame is gone and its surviving claim moved onto this one |
 | `10a-jackpot-intro-early.png` | `JACKPOT_INTRO` a quarter in: the reels have **already** broken loose and the gold has barely started. The reels are unlocked from the first instant of act two, so the wash arrives over a machine that is moving rather than over a still one |
 | `10b-jackpot-intro-mid.png` | the same wash half in, the strip somewhere else, still nothing landed |
 | `10c-jackpot-intro-late.png` | the same wash nearly complete, reels still turning. Three frames rather than one because a single still of a half-gold machine cannot tell an overlap from a sequence. Each step asserts both halves at once — progress inside its own band, and every column unlocked and already carrying `jackpotSymbol()` — so a frame in which the machine had stopped would fail rather than merely look wrong |
@@ -149,13 +148,25 @@ fallback chest, or would draw one sprite twice.
 
 The three screens need no world. The HUD widget normally does, because Minecraft only draws the HUD
 while a world is rendering, so `SlotStageScreen` calls the shipped
-`SlotMachineHud.extractRenderState` directly instead — shots 05–09 come from the real render path,
+`SlotMachineHud.extractRenderState` directly instead — shots 05–08 come from the real render path,
 not from a stand-in drawing.
 
-#### Shots 20–22: Hypixel's server resource pack
+#### Hypixel's server resource pack — mandatory, not optional
 
-These three need the pack itself. Drop a copy of SkyBlock's server pack into the node's
-`run/resourcepacks/` and select it in that run directory's `options.txt`:
+**The pack is required for the whole run, and a run without it aborts before the first shutter.**
+This used to read as a setup note for shots 20–22 alone, and that understatement is how two
+releases of screenshots shipped drawing vanilla art: the pack was mounted, every reel item quietly
+fell back to its vanilla model because no stack carried a `hypixel_skyblock` `item_model`, and a log
+line saying the pack had loaded was mistaken for proof that it was being used. `PackEnforcement`
+now runs three `require()` steps ahead of shot 01 — the namespace must be mounted, the index must
+hold a real number of item definitions, and a spot check must resolve definition → model → texture
+→ baked model — and after the shots it decodes the written PNGs and searches each one for Hypixel's
+own texture and for the vanilla texture the drop would have drawn instead. A frame carrying vanilla
+art is renamed `REJECTED-*.png` so it cannot be copied into `docs/images/` by anyone who did not
+read the summary.
+
+Drop a copy of SkyBlock's server pack into the node's `run/resourcepacks/` and select it in that run
+directory's `options.txt`:
 
 ```
 resourcePacks:["file/hypixel_server_pack.zip"]

@@ -71,7 +71,7 @@ configurable.
 
 1. Minecraft **26.1.2** (or 26.2) with **Fabric Loader 0.19.3+** and **Java 25**
 2. [Fabric API](https://modrinth.com/mod/fabric-api)
-3. `skyprism-1.0.3+26.1.2.jar` (or `skyprism-1.0.3+26.2.jar`) from [Releases](../../releases)
+3. `skyprism-1.0.4+26.1.2.jar` (or `skyprism-1.0.4+26.2.jar`) from [Releases](../../releases)
    → your `mods/` folder
 4. *Optional but recommended:* [YACL](https://modrinth.com/mod/yacl) and
    [Mod Menu](https://modrinth.com/mod/modmenu) for the settings screen

@@ -8,9 +8,12 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -29,12 +32,29 @@ import java.util.Set;
  *
  * <h2>Where the names come from, and why none of them are invented</h2>
  *
- * <p>{@link LootSourceRegistry} already carries, per source, the drops worth celebrating -- a list
- * transcribed from the wiki and pinned by {@code DropSymbolsMcTest}, which fails if any of them
- * lacks a sprite or if two of one source's drops land on the same picture. So a strip is that list
- * and nothing else, sorted case-insensitively so the drum reads the same in every JVM
- * ({@code Set.copyOf} randomises iteration order per process, which would otherwise arrange the
- * strip differently every session and make any test of it flaky).</p>
+ * <p>{@link LootSourceRegistry#dropPool} carries, per source, everything that source actually pays
+ * -- transcribed from the wiki, every name pinned to a real SkyBlock item by
+ * {@code SkyBlockNameSnapshotTest} and to a sprite of its own by {@code DropSymbolsMcTest}. So a
+ * strip is that pool and nothing else, in the pool's own case-insensitive order so the drum reads
+ * the same in every JVM.</p>
+ *
+ * <p>It used to be the narrower {@code jackpotItems()} list, which is the drops worth a
+ * three-of-a-kind flourish -- and that list is written to <em>exclude</em> the commonest drops,
+ * because celebrating a Griffin Feather that falls off two thirds of all burrow treasure would
+ * empty the celebration of meaning. Correct for the flourish, wrong for the drum: it deleted from
+ * Diana's reel the two items a Diana player would name first. The two questions now have two
+ * lists.</p>
+ *
+ * <h2>Why a strip is a window and not the whole pool</h2>
+ *
+ * <p>A roll shows twenty-one consecutive slots of the drum and no more -- the arithmetic is on
+ * {@link #WINDOW} -- so past that length, adding a symbol lowers the odds of every other symbol
+ * appearing. That is the reported bug, stated as a number: the Chimera book has always been on
+ * Diana's strip and a player who has killed hundreds of Inquisitors had never seen it, because it
+ * was one unremarkable book among sixteen distinctive sprites for one 150 ms cell in one column.
+ * Filling the pool out to all thirty of the ritual's drops without capping the strip would have
+ * dropped it to seven rolls in ten. So the pool is complete, the strip is at most twenty-one of it,
+ * and {@link #SIGNATURES} pins the handful that must be in every window.</p>
  *
  * <p>Sources whose loot table nobody could verify carry an empty jackpot list, and a source with
  * two names would scroll the same two pictures round and round -- which reads as a stalled reel
@@ -64,6 +84,31 @@ final class FillerStrip {
      * the single global strip was.</p>
      */
     static final int MIN_LENGTH = 10;
+
+    /**
+     * How many symbols a strip may hold before a roll stops being able to show all of them.
+     *
+     * <p>This is arithmetic, not taste. {@code SlotMachineHud} advances a reel one strip index
+     * every {@code STRIP_CELL_MILLIS} (150), offsets each column by {@code REEL_STRIP_OFFSET_MILLIS}
+     * (50) and by three indices, and the reels lock at {@code spinMillis} (1200) plus
+     * {@code lockStaggerMillis} (250) each. Working the three columns out:</p>
+     *
+     * <pre>
+     *   reel 0 shows strip slots  -1 .. 9    (11)
+     *   reel 1 shows strip slots   2 .. 14   (13)
+     *   reel 2 shows strip slots   5 .. 19   (15)
+     *   union                     -1 .. 19   (21 consecutive indices)
+     * </pre>
+     *
+     * <p>So a roll shows exactly twenty-one consecutive slots of the drum. A strip of twenty-one or
+     * fewer therefore puts <em>every</em> symbol on screen at least once in every roll; a strip of
+     * thirty shows twenty-one of them and leaves which nine to the wall clock. That is the whole of
+     * the reported bug: a player who has killed hundreds of Minos Inquisitors had never once seen
+     * the Chimera book scroll past. Filling Diana's pool out to the thirty things the ritual
+     * actually pays would have made that worse, not better -- so the pool grew and the strip is a
+     * window onto it, capped here, with {@link #SIGNATURES} pinned inside every window.</p>
+     */
+    static final int WINDOW = 21;
 
     /**
      * How stale a resolved sprite may be before it is looked up again.
@@ -102,6 +147,20 @@ final class FillerStrip {
             "Enchanted Obsidian",
             "Enchanted Quartz Block",
             "Enchanted Glowstone");
+
+    /**
+     * The drops that have to be on a strip whatever else is, because they are what make the machine
+     * legible as that machine.
+     *
+     * <p>Only sources whose pool is wider than {@link #WINDOW} need an entry, because a shorter
+     * pool is shown whole. The names are the ones a player would use to describe the content out
+     * loud: Diana is griffin feathers, ancient claws and the Inquisitor's book; a slayer is one
+     * signature drop per boss, so that a Voidgloom roll cannot scroll six colours of dye and
+     * nothing else. Anything here that its source does not actually pay is ignored rather than
+     * inserted -- this pins what is shown, it cannot invent loot -- and {@code
+     * SlotMachineFillerMcTest} fails if a name here has gone stale.</p>
+     */
+    private static final Map<LootSource, List<String>> SIGNATURES = signatures();
 
     /** One strip per source, indexed by ordinal; built once, never replaced. */
     private static final FillerStrip[] BY_SOURCE = buildAll();
@@ -226,6 +285,17 @@ final class FillerStrip {
     }
 
     /**
+     * The pinned names, exposed so a test can catch one that its source has stopped paying.
+     *
+     * <p>A stale pin fails silently -- {@link #window} skips it rather than inventing loot, and the
+     * window quietly loses a slot to nothing -- which is precisely the kind of rot that needs a
+     * machine watching it.</p>
+     */
+    static Map<LootSource, List<String>> signaturesForTest() {
+        return SIGNATURES;
+    }
+
+    /**
      * This strip's sprites, one per name, in the same order.
      *
      * <p>The array is allocated at most once for the session and rewritten in place after that, so
@@ -275,23 +345,28 @@ final class FillerStrip {
     }
 
     /**
-     * One source's strip: its own celebrated drops, then generic material up to
-     * {@link #MIN_LENGTH}.
+     * One source's strip: a window onto its whole drop pool, topped up to {@link #MIN_LENGTH} with
+     * generic material when the pool is thin.
      *
-     * <p>No cap at the top end. A source with twenty-two verified drops shows twenty-two, which
-     * costs a refresh twenty-two probes twice a second and costs the drum nothing at all -- three
-     * cells are drawn per reel per frame however long the strip is.</p>
+     * <p>The pool is {@link LootSourceRegistry#dropPool}, which is everything the source pays and
+     * not only the drops worth a flourish -- so a Diana reel scrolls Griffin Feathers and Ancient
+     * Claws again, and a slayer reel scrolls something from each of the six bosses. It arrives
+     * already sorted case-insensitively, which is what keeps the drum arranged the same in every
+     * JVM.</p>
+     *
+     * <p>A pool of {@link #WINDOW} or fewer is the strip. A wider pool is sampled, because a
+     * twenty-one-slot roll cannot show more than twenty-one symbols and lengthening the drum past
+     * that only lowers the odds of any particular symbol appearing -- which is precisely how the
+     * Chimera book became invisible. The sample takes {@link #SIGNATURES} first and then walks the
+     * remainder at an even stride, so it spans the whole alphabet rather than stopping at C, and it
+     * is a pure function of the pool, so it is the same window in every session and a test can pin
+     * it.</p>
      */
     private static String[] resolve(LootSource source) {
         Set<String> keys = new LinkedHashSet<>();
         List<String> strip = new ArrayList<>();
 
-        List<String> own = new ArrayList<>(LootSourceRegistry.info(source).jackpotItems());
-        // Sorted, because LootSourceInfo freezes that list with Set.copyOf, whose iteration order
-        // is randomised per JVM: without this the drum would be arranged differently in every
-        // session and no test could pin it.
-        own.sort(String.CASE_INSENSITIVE_ORDER);
-        for (String name : own) {
+        for (String name : window(source, LootSourceRegistry.dropPool(source))) {
             add(keys, strip, name);
         }
         for (String name : GENERIC) {
@@ -301,6 +376,83 @@ final class FillerStrip {
             add(keys, strip, name);
         }
         return strip.toArray(new String[0]);
+    }
+
+    /**
+     * At most {@link #WINDOW} of {@code pool}, in the pool's own order, signatures included.
+     *
+     * @param source the source, for its {@link #SIGNATURES} row
+     * @param pool   its whole drop pool, already sorted
+     * @return the pool itself when it fits, otherwise the sample described on {@link #resolve}
+     */
+    private static List<String> window(LootSource source, List<String> pool) {
+        if (pool.size() <= WINDOW) {
+            return pool;
+        }
+        Set<String> chosen = new LinkedHashSet<>();
+        Map<String, String> spellings = new LinkedHashMap<>();
+        for (String name : pool) {
+            spellings.putIfAbsent(name.toLowerCase(Locale.ROOT), name);
+        }
+        for (String name : SIGNATURES.getOrDefault(source, List.of())) {
+            // The POOL's spelling, not the signature list's, so a difference of case here cannot
+            // cost the window a slot to a name the strip then deduplicates away. Null -- the source
+            // no longer pays it -- is skipped rather than inserted: a signature list is allowed to
+            // pin what is shown and is not allowed to put loot on a machine.
+            String spelling = spellings.get(name.toLowerCase(Locale.ROOT));
+            if (spelling != null && chosen.size() < WINDOW) {
+                chosen.add(spelling);
+            }
+        }
+        List<String> rest = new ArrayList<>(pool.size());
+        for (String name : pool) {
+            if (!chosen.contains(name)) {
+                rest.add(name);
+            }
+        }
+        int need = WINDOW - chosen.size();
+        for (int i = 0; i < need; i++) {
+            // Even stride over what is left, so the window is spread across the pool instead of
+            // being its first twenty-one names -- an alphabetical prefix would mean a slayer strip
+            // that stops somewhere around "Etherwarp Merger" for ever.
+            chosen.add(rest.get((int) ((long) i * rest.size() / need)));
+        }
+        List<String> ordered = new ArrayList<>(chosen);
+        ordered.sort(String.CASE_INSENSITIVE_ORDER);
+        return ordered;
+    }
+
+    private static Map<LootSource, List<String>> signatures() {
+        Map<LootSource, List<String>> map = new EnumMap<>(LootSource.class);
+
+        // Diana's is deliberately almost the whole of the strip as it stood before the pool grew:
+        // one signature drop per mythological creature, plus the burrow treasure. Widening the pool
+        // to everything the ritual pays must not cost the drum a single sprite a Diana player
+        // already recognises, so the twenty-nine-name pool is sampled around these rather than
+        // across them, and what rotates through the two slots left over is the attribute shards and
+        // the coin line. The Chimera book is first because it is the one that was reported missing.
+        map.put(LootSource.DIANA_MYTHOLOGICAL, List.of(
+                "Chimera I", "Griffin Feather", "Ancient Claw", "Minos Relic", "Daedalus Stick",
+                "Crown of Greed", "Mythological Dye", "Braided Griffin Feather", "Myth the Fish",
+                "Crochet Tiger Plushie", "Shimmering Wool", "Manti-core", "Washed-up Souvenir",
+                "Cretan Urn", "Hilt of Revelations", "Brain Food", "Antique Remedies",
+                "Dwarf Turtle Shelmet", "Fateful Stinger"));
+
+        // One LootSource carries all six slayers, so the risk here is the opposite one: a
+        // seventy-six-name pool sampled evenly could easily say nothing about a whole boss. Two per
+        // fight, chosen as what a player would name if asked what that slayer drops, plus the
+        // Enchanted Book that every one of the six tables pays and that a real Chimera, Smite VI or
+        // Critical VI arrives in chat as.
+        map.put(LootSource.SLAYER_BOSS, List.of(
+                "Enchanted Book",
+                "Judgement Core", "Etherwarp Merger",
+                "Warden Heart", "Beheaded Horror",
+                "Tarantula Talisman", "Fly Swatter",
+                "Overflux Capacitor", "Red Claw Egg",
+                "Archfiend Dice", "Subzero Inverter",
+                "Handy Blood Chalice", "Sangria Dye"));
+
+        return Map.copyOf(map);
     }
 
     private static void add(Set<String> keys, List<String> strip, String name) {

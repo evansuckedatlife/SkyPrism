@@ -44,6 +44,8 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
@@ -131,7 +133,7 @@ public final class SelfTest {
     private static final int SHOT_TIMEOUT_TICKS = 5 * TPS;
 
     /** Ceiling on the whole run. Whatever else happens, the client is asked to stop by here. */
-    private static final int WATCHDOG_TICKS = 240 * TPS;
+    private static final int WATCHDOG_TICKS = 480 * TPS;
 
     /** The level sampled to prove chroma actually moved between the two palette frames. */
     private static final int CHROMA_SAMPLE_LEVEL = 600;
@@ -312,6 +314,81 @@ public final class SelfTest {
                 "32-source-rare-fish", FISHING_DROPS);
     }
 
+    /**
+     * What each published frame is expected to be showing, and how hard the audit may press.
+     *
+     * <p>The list is the answer to "which pictures is anybody going to publish", and it is
+     * deliberately written here rather than derived, because the audit's whole job is to hold
+     * the frames somebody copies into {@code docs/images/} to Hypixel's art and a frame it has
+     * never heard of is a frame nothing checks.</p>
+     *
+     * <p>Mode by mode: a settled reel shows its three drops unwashed and is held to the pack; a
+     * mid-spin reel shows filler rather than the drops, and a held jackpot composites gold and
+     * glint over the sprite, so neither can be matched byte for byte and neither pretends to be.
+     * Frame 20 is the deliberate before-picture and is expected to be vanilla, which is why it is
+     * the one frame nothing here can fail on.</p>
+     *
+     * <p>The audit proves itself off this same set rather than off a special frame. Every settled
+     * frame carries at least one drop the pack has no art for -- Judgement Core, Silver Magmafish,
+     * Griffin Feather -- and those are drawn in flat vanilla textures the search finds. A run in
+     * which it finds none of them is a run whose every "no vanilla art here" is worthless, and it
+     * fails on exactly that ground.</p>
+     *
+     * @return the frames to audit, in capture order
+     */
+    private static List<PackEnforcement.Frame> auditPlan() {
+        List<String> pack = HypixelPackProof.reelNames(3);
+        return List.of(
+                new PackEnforcement.Frame("05-slot-spinning.png",
+                        PackEnforcement.namesOf(ORDINARY_DROPS),
+                        PackEnforcement.Mode.STRUCTURE_ONLY,
+                        "mid-spin: the three cells on screen are filler-strip entries, not the "
+                                + "drops this roll will land on"),
+                new PackEnforcement.Frame("07-slot-all-reels-locked.png",
+                        PackEnforcement.namesOf(ORDINARY_DROPS),
+                        PackEnforcement.Mode.PACK_ART,
+                        "all three reels settled on the drops, no gold anywhere"),
+                new PackEnforcement.Frame("08-jackpot-act-one-spinning.png",
+                        PackEnforcement.namesOf(JACKPOT_DROPS),
+                        PackEnforcement.Mode.STRUCTURE_ONLY,
+                        "mid-spin, same as 05"),
+                // 09-jackpot-settled-no-gold.png is deliberately absent. It was the one PACK_ART
+                // frame taken off a jackpot roll, and it could be one only because the reels used
+                // to stop dead on the real drops before the celebration started. They no longer
+                // do, so there is no instant on a jackpot roll at which its three drops are on
+                // screen unwashed and a fourth frame claiming otherwise would be a claim about a
+                // picture that cannot be taken. 07 carries the settled-reels-against-the-pack duty
+                // for the whole run.
+                new PackEnforcement.Frame("14-jackpot-hold.png",
+                        PackEnforcement.namesOf(JACKPOT_DROPS),
+                        PackEnforcement.Mode.STRUCTURE_ONLY,
+                        "the gold wash and the enchantment glint composite over the sprite, so an "
+                                + "exact texel match cannot hold and is not claimed"),
+                new PackEnforcement.Frame("15-jackpot-hold-no-magic-find.png",
+                        PackEnforcement.namesOf(JACKPOT_DROPS_NO_MAGIC_FIND),
+                        PackEnforcement.Mode.STRUCTURE_ONLY,
+                        "gold wash, same as 14"),
+                new PackEnforcement.Frame("20-pack-before-vanilla.png", pack,
+                        PackEnforcement.Mode.VANILLA_ART,
+                        "the before-picture, captured while these names are still on the "
+                                + "synthesised fallback, so vanilla art is what it is for"),
+                new PackEnforcement.Frame("21-pack-after-hypixel.png", pack,
+                        PackEnforcement.Mode.PACK_ART,
+                        "the same reel after the same names were taught Hypixel's ids"),
+                new PackEnforcement.Frame("30-source-slayer-boss.png",
+                        PackEnforcement.namesOf(SLAYER_DROPS),
+                        PackEnforcement.Mode.PACK_ART,
+                        "settled on a slayer payout"),
+                new PackEnforcement.Frame("31-source-dungeon-chest.png",
+                        PackEnforcement.namesOf(CHEST_DROPS),
+                        PackEnforcement.Mode.PACK_ART,
+                        "settled on a dungeon reward chest"),
+                new PackEnforcement.Frame("32-source-rare-fish.png",
+                        PackEnforcement.namesOf(FISHING_DROPS),
+                        PackEnforcement.Mode.PACK_ART,
+                        "settled on a Lord Jawbus payout"));
+    }
+
     /** Guards against a second {@code arm()}; the property is read once, but belt and braces. */
     private static boolean armed;
 
@@ -324,6 +401,26 @@ public final class SelfTest {
 
     private int ticks;
     private boolean finished;
+
+    /**
+     * Hypixel's pack as the client can see it, loaded by the gate before the first capture.
+     *
+     * <p>Null until that step runs, and the run does not survive that step failing, so every
+     * later reader can treat it as present.</p>
+     */
+    private PackAssets pack;
+
+    /**
+     * Why the run stopped early, or null while it is still going.
+     *
+     * <p>Set by {@link #require}, which is for the handful of steps whose failure makes every
+     * later step worthless. {@link #call} deliberately does not do this: an ordinary step that
+     * fails is recorded and stepped over, because the rest of the run is still worth having.</p>
+     */
+    private String abortReason;
+
+    /** Every capture file this run intends to write, so a stale one cannot survive an abort. */
+    private final List<String> plannedCaptures = new ArrayList<>();
 
     /** The stage screen, once opened, so captions can be set between shots. */
     private SlotStageScreen stage;
@@ -480,6 +577,25 @@ public final class SelfTest {
         call("stage the settings this run needs", this::stageSettings);
         call("bind default item components so sprites can draw without a world",
                 ItemComponents::bindDefaults);
+
+        // --- 0. the pack gate, which runs BEFORE the first shutter ---------------------------
+        //
+        // Ordering is the entire point of this block. The old arrangement checked the pack in
+        // step 5b, after fifteen captures were already on disk, so a run against a missing or
+        // rejected pack produced a full set of vanilla screenshots and one failed line in a JSON
+        // file nobody reads before copying a PNG into the README. These three steps make that
+        // impossible: nothing is photographed until the pack is proved active, the previous
+        // run's files are removed so an abort cannot leave publishable-looking output behind,
+        // and every drop name the pack has art for is dressed with Hypixel's own item_model
+        // before the first shutter rather than after the last one.
+        require("Hypixel's server resource pack is active BEFORE any capture is written", () -> {
+            pack = PackAssets.load();
+            return PackEnforcement.requireActive(pack);
+        });
+        require("clear the captures an earlier run left behind",
+                () -> PackEnforcement.clearStale(outDir, plannedCaptures));
+        require("dress every drop name the pack has art for, before the first shutter",
+                () -> PackEnforcement.dress(pack, auditPlan()));
 
         // --- 1. the YACL settings screen, opened the way ModMenu opens it -------------------
         call("open the YACL settings screen", () -> {
@@ -665,40 +781,41 @@ public final class SelfTest {
 
         caption("JACKPOT roll, act one: an ordinary spin -- the rare drop is already captured");
         awaitRoll(() -> midSpinAt);
-        call("act one of a jackpot roll is still an ordinary spin",
-                () -> requireState(RollState.SPINNING, RollState.LOCKING));
-        shot("screenshot: jackpot roll, act one spinning", "08-jackpot-act-one-spinning.png",
-                this::stageReady);
-
-        caption("JACKPOT roll, act one settled: the real drops, no gold anywhere");
-        awaitRoll(() -> allLockedAt);
-        call("the settled result of a jackpot roll is untouched", () -> {
-            String where = requireState(RollState.SETTLED);
+        // Both halves of the old pair are asserted here, on the one frame that can still carry
+        // them. There used to be a second act-one shot -- "the settled result of a jackpot roll
+        // is untouched" -- taken after every column had locked and held. That frame's premise is
+        // gone on purpose: it was a photograph of the stall, and a jackpot roll now never reaches
+        // SETTLED and never lands a column before the prize does. What survives of its claim is
+        // the negative one, that a rare captured at offer time puts no gold on act one, and that
+        // is true here and checkable without a second still of the same spinning machine.
+        call("act one of a jackpot roll is an ordinary spin with no gold on it", () -> {
+            String where = requireState(RollState.SPINNING);
             SlotRoll roll = DianaController.get().roll();
             if (!roll.jackpot()) {
                 throw new IllegalStateException("jackpot() is false after a rare drop was offered");
             }
             if (roll.inJackpotSequence()) {
                 throw new IllegalStateException(
-                        "the jackpot sequence has already begun during the settle phase");
+                        "the jackpot sequence has already begun during act one");
             }
             if (roll.jackpotIntroProgress() != 0.0d) {
                 throw new IllegalStateException("jackpotIntroProgress is "
-                        + roll.jackpotIntroProgress() + " while the roll is merely settled, so "
-                        + "the HUD would be drawing gold over act one");
+                        + roll.jackpotIntroProgress() + " while act one is still spinning, so "
+                        + "the HUD would be drawing gold over it");
             }
             for (Reel reel : roll.reels()) {
-                if (!reel.locked()) {
-                    throw new IllegalStateException("column " + reel.index()
-                            + " is still spinning during the settle phase");
+                if (reel.locked()) {
+                    throw new IllegalStateException("column " + reel.index() + " has already "
+                            + "landed during act one, which is the dead stop this sequence "
+                            + "exists to remove");
                 }
             }
             return where + "; jackpot() is true but inJackpotSequence() is false and "
                     + "jackpotIntroProgress() is 0, so every gold term in the HUD is multiplied "
-                    + "by zero and this frame is the ordinary result";
+                    + "by zero, and no column has landed";
         });
-        shot("screenshot: jackpot roll, settled with no gold",
-                "09-jackpot-settled-no-gold.png", this::stageReady);
+        shot("screenshot: jackpot roll, act one spinning", "08-jackpot-act-one-spinning.png",
+                this::stageReady);
 
         caption("JACKPOT act two opens: reels ALREADY turning, gold has barely started");
         awaitRoll(() -> goldWashEarlyAt);
@@ -889,6 +1006,8 @@ public final class SelfTest {
                 LootSource.SLAYER_BOSS, "Voidgloom Seraph IV", SLAYER_DROPS));
         caption("Slayer: the longest subject the feature can produce, on a boss kill");
         awaitRoll(() -> allLockedAt);
+        call("the slayer reel is settled on its three drops",
+                () -> requireSettledOnDrops(SLAYER_DROPS));
         shot("screenshot: the widget captioned for a slayer boss",
                 "30-source-slayer-boss.png", this::stageReady);
 
@@ -896,6 +1015,8 @@ public final class SelfTest {
                 LootSource.DUNGEON_REWARD_CHEST, "Obsidian Chest", CHEST_DROPS));
         caption("Chest: a container, not a kill -- the subject is the chest that was opened");
         awaitRoll(() -> allLockedAt);
+        call("the chest reel is settled on its three drops",
+                () -> requireSettledOnDrops(CHEST_DROPS));
         shot("screenshot: the widget captioned for a dungeon reward chest",
                 "31-source-dungeon-chest.png", this::stageReady);
 
@@ -903,6 +1024,8 @@ public final class SelfTest {
                 LootSource.FISHING_RARE_SEA_CREATURE, "Lord Jawbus", FISHING_DROPS));
         caption("Fishing: a rare sea creature, the source that is open on every island");
         awaitRoll(() -> allLockedAt);
+        call("the fishing reel is settled on its three drops",
+                () -> requireSettledOnDrops(FISHING_DROPS));
         shot("screenshot: the widget captioned for a rare sea creature",
                 "32-source-rare-fish.png", this::stageReady);
 
@@ -919,6 +1042,69 @@ public final class SelfTest {
             return "SlotRoll.sourceAt reports FISHING_RARE_SEA_CREATURE, so the widget above is "
                     + "drawing a genuine non-Diana event rather than a relabelled Diana one";
         });
+
+        // --- 5d. the roll as a SEQUENCE, and the Chimera book on an Inquisitor spin ---------
+        //
+        // Every frame above is a still, and a still cannot answer either of the two questions
+        // Evan asked. "Does the strip stall between the acts" is a question about consecutive
+        // frames, and "is the Chimera book ever on the drum" is a question about the whole roll
+        // rather than about the two instants somebody happened to photograph. So this stage
+        // photographs an Inquisitor jackpot end to end, one frame per capture cycle, and writes
+        // the number the renderer itself used to place the strip beside each one.
+        //
+        // The scroll figure is READ, not modelled: SlotMachineHud.stripTravelled is the same
+        // ReelScroll.cellsTravelled call drawFrame makes, and visibleStripCells walks the same
+        // two cell functions drawSpinningReel walks. A second model of the strip would be a
+        // second thing to drift, which is the bug that produced the last broken capture run.
+        call("show the stage again for the sequence", () -> {
+            show(stage);
+            return "back on SlotStageScreen for the frame sequence";
+        });
+        call("start an Inquisitor jackpot roll to photograph end to end",
+                () -> startRoll(true));
+        sequence();
+        call("the sampled sequence rolls, celebrates, rolls again and lands with no stall",
+                this::reportSequence, () -> sequenceReport);
+
+        // The Chimera book. It is an ENCHANTMENT, so the drop is an Enchanted Book and the strip
+        // entry is "Chimera I"; Evan's complaint is that he has never seen it go past inside the
+        // Inquisitor animation. Asked exhaustively rather than by sampling: every millisecond of
+        // a fresh Inquisitor roll is put through the live visibleStripCells, so the answer is
+        // "on these milliseconds, in these columns" instead of "it was there when I looked".
+        // Repeated for up to fifty rolls, and the count is reported whether it took one or none.
+        huntChimera();
+        call("the Chimera book scrolls past on an Inquisitor spin", this::reportChimera,
+                () -> chimeraReport);
+        call("start one more Inquisitor roll, to photograph the Chimera cell",
+                () -> startRoll(true));
+        caption("The Chimera enchanted book, scrolling past on a Minos Inquisitor spin");
+        awaitRoll(() -> chimeraFrameAt);
+        // Four in a row rather than one. A capture cycle costs about a tick and a readback, so
+        // these land roughly a tenth of a second apart, and the book is in a given column's
+        // window for about three cell periods -- so the burst brackets it instead of betting the
+        // whole claim on one instant landing inside a 150 ms slot.
+        shot("screenshot: the Chimera book on the drum, first of four",
+                "40a-chimera-on-the-drum.png", this::stageReady);
+        shot("screenshot: the Chimera book on the drum, second of four",
+                "40b-chimera-on-the-drum.png", this::stageReady);
+        shot("screenshot: the Chimera book on the drum, third of four",
+                "40c-chimera-on-the-drum.png", this::stageReady);
+        shot("screenshot: the Chimera book on the drum, fourth of four",
+                "40d-chimera-on-the-drum.png", this::stageReady);
+
+        // --- 5c. the enforcement: what the frames ACTUALLY drew, in pixels -------------------
+        //
+        // Everything above this line is a claim about state -- the pack is selected, the
+        // namespace resolves, the stack carries an item_model. Every one of those was true of
+        // the run whose screenshots were drawn entirely in vanilla art, because not one of them
+        // is a statement about a picture. This step is. It reads the PNGs back off disk and
+        // looks for two textures in each: Hypixel's own art for the drop, which has to be there,
+        // and the vanilla texture that drop used to draw, which must not be. A frame that fails
+        // is renamed REJECTED-<name>.png before this step returns, so the failure survives being
+        // ignored by whoever is copying files into docs/images/.
+        call("every published frame drew Hypixel's art wherever Hypixel has art",
+                () -> PackEnforcement.audit(outDir, pack, auditPlan()),
+                () -> outDir.resolve(PackEnforcement.REPORT_FILE));
 
         // --- 6. level recolouring, end to end, with no server -------------------------------
         call("level recolour end to end, no server", () -> {
@@ -1108,9 +1294,45 @@ public final class SelfTest {
     private String startSourceRoll(LootSource source, String subject, List<LootDrop> drops) {
         SkyPrismConfig.DianaSettings diana = ConfigManager.get().config().diana;
         long now = System.currentTimeMillis();
-        if (!LootMachine.get().simulate(new LootEvent(source, subject, now), drops)) {
+        // The event is admitted through LootMachine, which is the general entry point and the
+        // reason these three frames exist. The DROPS are then offered straight to the roll, with
+        // the rare-drop banner taken off each one. Both departures from
+        // LootMachine.simulate(event, drops) are deliberate and they answer the same problem.
+        //
+        // These frames are documented, above, to stage "only the ordinary act ... shots 08-14
+        // already own [the celebration]", and the pack audit holds each of them to three distinct
+        // Hypixel sprites. Neither is possible on a roll that celebrates: act two now opens at
+        // the first column's lock instead of waiting out the settle, so a celebrating roll never
+        // rests on its three real drops at all -- it goes straight into the gold and converges
+        // every column on one item. Aimed at the settle, these three would have photographed a
+        // gold-washed re-spin showing filler-strip entries.
+        //
+        // Two separate things armed it. The fixtures flag their marquee item rare, because in the
+        // wild it really does raise a banner; and simulate() re-flags any name on the source's
+        // jackpot list anyway, which covers Judgement Core, Null Atom, Necron's Handle,
+        // Radioactive Vial, Magma Lord Fragment and Silver Magmafish between them. So the banner
+        // is stripped here, at stage time, rather than by editing the fixtures into payouts
+        // nobody receives: the fixture stays a true record of a real drop table, and this method
+        // stays honest that what it stages is the ordinary act. The promotion path is not left
+        // unexercised -- it is what arms the Diana jackpot in shots 08-14.
+        if (!LootMachine.get().simulate(new LootEvent(source, subject, now), null)) {
             throw new IllegalStateException("LootMachine has no roll wired; cannot simulate "
                     + source);
+        }
+        SlotRoll staged = DianaController.get().roll();
+        if (staged == null) {
+            throw new IllegalStateException("no roll to stage " + source + " drops on");
+        }
+        for (LootDrop drop : drops) {
+            if (drop != null) {
+                // Every component spelled out rather than a 4-arg rebuild: Magic Find is carried
+                // on LootDrop and rebuilding by hand is exactly what silently dropped it once
+                // before -- see LootDrop.asRare()'s javadoc for that bug.
+                staged.offerDrop(drop.rare()
+                        ? new LootDrop(drop.itemName(), drop.colorCode(), drop.count(), false)
+                                .withMagicFind(drop.magicFind())
+                        : drop);
+            }
         }
         rollStartedAt = now;
 
@@ -1169,13 +1391,40 @@ public final class SelfTest {
                     + midSpinAt + " / " + oneLockedAt + " / " + allLockedAt + " ms";
         }
 
-        // ---- act two, every offset measured from the end of the settle phase ----
+        // ---- act two, every offset measured from where the ROLL says it opens ----
         //
-        // The reels break loose at settledAt, not at introEnd: the wash and the spin that
-        // follows it are one continuous stretch of moving reels, and introEnd is only where the
-        // gold finishes arriving. That is why three of the capture points below sit inside the
-        // wash rather than waiting for it to be over.
-        long introEnd = settledAt + diana.jackpotIntroMillis;
+        // NOT from the end of the settle. Act two used to be anchored on settledAt, and that
+        // anchor is exactly the stall: a celebration that cannot begin until act one has locked
+        // every column and then held them for the whole settle is a celebration with a dead stop
+        // in front of it. SlotRoll now opens act two at the first column's ordinary lock instant
+        // -- or at the banner, when Hypixel prints the rare-drop line late -- so the reels are
+        // still turning when the gold arrives and never come to rest before the prize lands.
+        //
+        // The instant is ASKED FOR rather than re-derived here. This script has already shipped
+        // one set of captures aimed at a timeline the machine had moved off underneath it (every
+        // frame from the gold wash onwards photographed an idle screen), and the cause was two
+        // copies of one rule drifting apart. jackpotActStartAt() is published by SlotRoll for
+        // precisely this reason, so there is now one copy.
+        // ON THE ROLL'S OWN CLOCK, and this is not a nicety. SystemClock counts from the moment
+        // the class was loaded, so its readings are a few seconds; System.currentTimeMillis() is
+        // about 1.79e12. Every ...At(long) on SlotRoll begins with sweepAt(now), which ends the
+        // roll once now is past its fade -- so handing one of them a wall-clock instant resets
+        // the roll it was asked about, on the spot. That is exactly what happened: the whole
+        // jackpot half of the last capture run photographed an empty machine, because this line
+        // killed the roll one statement after starting it.
+        SlotRoll live = DianaController.get().roll();
+        long rollNow = live.nowMillis();
+        long actTwoStart = live.jackpotActStartAt(rollNow) - live.rollStartAt(rollNow);
+        if (actTwoStart < 0L || actTwoStart >= settledAt) {
+            throw new IllegalStateException("a jackpot was offered at roll start but the roll "
+                    + "reports act two opening at " + actTwoStart + " ms, which is outside the "
+                    + "[0, " + settledAt + ") window a captured rare guarantees; the capture "
+                    + "points below would photograph the wrong phase");
+        }
+
+        // The wash and the spin that follows it are one continuous stretch of moving reels;
+        // introEnd is only where the gold finishes arriving, not where the reels break loose.
+        long introEnd = actTwoStart + diana.jackpotIntroMillis;
         long spinEnd = introEnd + diana.jackpotSpinMillis;
         long lastMatch = spinEnd + (long) (reels - 1) * diana.jackpotLockStaggerMillis;
 
@@ -1183,9 +1432,9 @@ public final class SelfTest {
         // than the edges because a frame at either edge is indistinguishable from "the gold
         // snapped on" and "the gold is simply in"; three points inside the ramp give a reader
         // the same machine at three depths of gold, with the strip somewhere different in each.
-        goldWashEarlyAt = settledAt + diana.jackpotIntroMillis / 4;
-        goldWashMidAt = settledAt + diana.jackpotIntroMillis / 2;
-        goldWashLateAt = settledAt + (diana.jackpotIntroMillis * 3L) / 4;
+        goldWashEarlyAt = actTwoStart + diana.jackpotIntroMillis / 4;
+        goldWashMidAt = actTwoStart + diana.jackpotIntroMillis / 2;
+        goldWashLateAt = actTwoStart + (diana.jackpotIntroMillis * 3L) / 4;
         jackpotSpinAt = introEnd + Math.max(200L, diana.jackpotSpinMillis / 2);
         // Just after the first column lands and comfortably before the second one does.
         firstMatchAt = spinEnd + Math.max(150L, diana.jackpotLockStaggerMillis / 3);
@@ -1193,11 +1442,13 @@ public final class SelfTest {
         thirdMatchAt = lastMatch + Math.max(120L, diana.jackpotLockStaggerMillis / 6);
         jackpotHoldAt = lastMatch + Math.min(3_000L, Math.max(500L, diana.jackpotHoldMillis / 2));
 
-        return "jackpot roll for " + creature.displayName() + "; act one locks at " + firstLock
-                + ".." + lastLock + " ms and settles until " + settledAt
-                + " ms with no gold on it, act two washes gold " + settledAt + ".." + introEnd
-                + " ms, respins to " + spinEnd + " ms and lands its three of a kind by "
-                + lastMatch + " ms; capturing at " + midSpinAt + " / " + allLockedAt + " / "
+        return "jackpot roll for " + creature.displayName() + "; act one spins with no gold on it "
+                + "and never lands -- act two takes the machine at " + actTwoStart
+                + " ms, where the first column would otherwise have locked, instead of waiting "
+                + "out the settle to " + settledAt + " ms; gold washes " + actTwoStart + ".."
+                + introEnd + " ms over reels that never stopped, the respin runs to " + spinEnd
+                + " ms and the three of a kind is complete by " + lastMatch
+                + " ms; capturing at " + midSpinAt + " / "
                 + goldWashEarlyAt + " / " + goldWashMidAt + " / " + goldWashLateAt + " / "
                 + jackpotSpinAt + " / " + firstMatchAt + " / " + thirdMatchAt + " / "
                 + jackpotHoldAt + " ms";
@@ -1223,6 +1474,66 @@ public final class SelfTest {
         }
         return "roll state is " + actual + " at "
                 + (System.currentTimeMillis() - rollStartedAt) + " ms";
+    }
+
+    /**
+     * Fails unless every column has landed, in order, on the drops this frame was staged with.
+     *
+     * <p>The guard frames 30-32 did not have, and the omission was not cosmetic. Those three had
+     * no phase assertion at all: they waited out an arithmetic offset and photographed whatever
+     * was on screen. When act two stopped waiting for the settle, the offset stopped landing in
+     * the settle, and three of the six frames Evan publishes would have been gold-washed re-spins
+     * of filler-strip entries -- reported as PASS, because nothing asked.</p>
+     *
+     * <p>Checking the reel <em>contents</em> rather than only the state is the point. A settled
+     * reel showing the wrong items is exactly the failure the pack audit exists to catch later in
+     * the run, and catching it here names the drop instead of naming a pixel.</p>
+     *
+     * @param expected the staged drops, one per column, in column order
+     * @return what the columns are showing, for the summary
+     */
+    private String requireSettledOnDrops(List<LootDrop> expected) {
+        String where = requireState(RollState.SETTLED);
+        SlotRoll roll = DianaController.get().roll();
+        if (roll.inJackpotSequence()) {
+            throw new IllegalStateException("this frame is staged as an ordinary settled roll but "
+                    + "the machine is in its celebration, so the reels are showing the jackpot "
+                    + "symbol rather than the three drops the frame is captioned for");
+        }
+        // Membership, not column order. SlotRoll ranks the drops before dealing them out, so the
+        // staged list (Judgement Core, Null Atom, Coins) reaches the screen as Judgement Core,
+        // Coins, Null Atom. Asserting the ranking here would be pinning a second copy of a rule
+        // that lives in SlotRoll and is tested there; what this frame needs is that the three
+        // sprites on it are the three it is captioned for.
+        List<Reel> reels = roll.reels();
+        List<String> want = new ArrayList<>();
+        for (LootDrop drop : expected) {
+            want.add(drop.itemName());
+        }
+        StringBuilder showing = new StringBuilder();
+        for (Reel reel : reels) {
+            if (!reel.locked()) {
+                throw new IllegalStateException("column " + reel.index() + " is still spinning, so "
+                        + "it is showing a filler-strip entry rather than a drop");
+            }
+            LootDrop drop = reel.symbol();
+            if (drop == null) {
+                throw new IllegalStateException("column " + reel.index() + " landed on nothing");
+            }
+            if (!want.remove(drop.itemName())) {
+                throw new IllegalStateException("column " + reel.index() + " shows "
+                        + drop.itemName() + ", which is not one of the drops this frame was "
+                        + "staged with (" + expected + ")");
+            }
+            if (!showing.isEmpty()) {
+                showing.append(", ");
+            }
+            showing.append(drop.itemName());
+        }
+        if (!want.isEmpty()) {
+            throw new IllegalStateException("staged drops that never reached a column: " + want);
+        }
+        return where + "; all " + reels.size() + " columns landed on " + showing;
     }
 
     /**
@@ -1528,6 +1839,15 @@ public final class SelfTest {
                     return;
                 }
                 program.poll();
+                if (abortReason != null) {
+                    record("run aborted", Status.FAIL, "a required step failed, so the remaining "
+                            + program.size() + " operations -- every one of the captures among "
+                            + "them -- were abandoned rather than run against a client that "
+                            + "cannot produce a trustworthy picture. Reason: " + abortReason,
+                            null);
+                    finish();
+                    return;
+                }
             }
         } catch (Throwable broken) {
             // The driver itself failing is the one thing that could hang the client, so it ends
@@ -1649,6 +1969,34 @@ public final class SelfTest {
         });
     }
 
+    /**
+     * A step whose failure ends the run instead of being recorded and stepped over.
+     *
+     * <p>{@link #call} is right for almost everything: a step that fails is written down and the
+     * script carries on, because the remaining captures are still worth having and their own
+     * failures will be more specific than a missing run would be. It is exactly wrong for the
+     * pack gate. A run that photographs fifteen screens with the wrong art produces fifteen files
+     * that look correct, and the only sign is one line in a JSON summary -- which is how this bug
+     * survived two releases. When the thing that makes every later picture meaningful is not
+     * there, the right output is no pictures at all and a sentence saying why.</p>
+     */
+    private void require(String id, StepBody body) {
+        program.add(() -> {
+            try {
+                record(id, Status.PASS, body.run(), null);
+            } catch (Skipped skipped) {
+                record(id, Status.SKIP, skipped.getMessage(), null);
+            } catch (Throwable broken) {
+                String why = describe(broken);
+                record(id, Status.FAIL, why, null);
+                LOGGER.error("SkyPrism self test cannot continue: \"{}\" failed, so the run is "
+                        + "ending WITHOUT writing any capture", id, broken);
+                abortReason = id + ": " + why;
+            }
+            return true;
+        });
+    }
+
     /** An unrecorded operation, for bookkeeping that is not worth a summary line. */
     private void plain(Runnable body) {
         program.add(() -> {
@@ -1702,6 +2050,374 @@ public final class SelfTest {
         });
     }
 
+    // ---------------------------------------------------------------- the sequence
+
+    /** How many ticks the frame sequence may run for before it gives up on the roll ending. */
+    private static final int SEQUENCE_CAP_TICKS = 90 * TPS;
+
+    /** The fastest the strip is ever configured to move, in milliseconds per cell. */
+    private static final double FASTEST_CELL_MILLIS = 65.0d;
+
+    /** Slack on the rate ceiling, to absorb the double arithmetic rather than a real teleport. */
+    private static final double RATE_SLACK = 1.0e-6d;
+
+    /** How often the Chimera hunt asks the strip what it is showing, in milliseconds. */
+    private static final long CHIMERA_STEP_MILLIS = 5L;
+
+    /** The strip entry the Inquisitor's Chimera book scrolls under. */
+    private static final String CHIMERA_ENTRY = "Chimera I";
+
+    /** Ceiling on the hunt, and the number Evan asked to be told if it is ever reached. */
+    private static final int CHIMERA_MAX_SPINS = 50;
+
+    /** One sampled frame of the sequence: what the renderer had, and where the shot went. */
+    private record Sample(int index, long elapsed, RollState state, double travelled,
+                          int locked, String windows, String file) {
+    }
+
+    private final List<Sample> sequenceSamples = new ArrayList<>();
+    private Path sequenceReport;
+
+    private Path chimeraReport;
+    private String chimeraDetail = "the hunt never ran";
+    private boolean chimeraFound;
+    private int chimeraSpins;
+    private long chimeraFrameAt = 400L;
+    private final List<String> chimeraLines = new ArrayList<>();
+
+    /**
+     * Photographs the running roll once per capture cycle until it ends.
+     *
+     * <p>One capture in flight at a time. That paces the loop to whatever the readback actually
+     * costs rather than to a guess, and it is the only way to keep the memory bounded: each
+     * takeScreenshot allocates a full-framebuffer NativeImage, so firing them blind would hold
+     * as many of those as the roll has ticks.</p>
+     *
+     * <p>Each sample records the instant, the phase, the scroll figure the renderer itself used
+     * and what the three windows were showing, so the report beside the PNGs describes the
+     * frames rather than a re-derivation of them.</p>
+     *
+     * <p><b>The PNG lags its own row by one capture cycle, and that is measurable rather than
+     * suspected.</b> {@code Screenshot.takeScreenshot} reads the framebuffer as it stands, and
+     * the framebuffer holds the last frame the render thread <em>presented</em>. Writing a
+     * 1920x1080 PNG synchronously occupies that same thread, so during a back-to-back burst the
+     * client presents about one frame per capture and the frame in {@code seq-N.png} was drawn
+     * just after {@code seq-(N-1)} was requested. Measured off the shipped run by solving the
+     * drum position out of the pixels: every photograph came out 500 ms behind the row written
+     * beside it, uniformly, on a cycle that also measured 530 ms. Both halves are correct in
+     * themselves -- the row is what the renderer had at that tick, the PNG is a real frame -- and
+     * the sequence they form is unaffected, because a uniform lag shifts every sample equally.
+     * It only means a row and the file named on it are one cycle apart, so do not read a single
+     * pairing as a claim about one instant. Isolated shots elsewhere in this script are not
+     * affected on that scale: they are separated by ticks that render normally.</p>
+     */
+    private void sequence() {
+        Path dir = outDir.resolve("sequence");
+        int[] index = {0};
+        int[] ticks = {0};
+        Shots.Capture[] pending = {null};
+        program.add(() -> {
+            if (++ticks[0] > SEQUENCE_CAP_TICKS) {
+                return true;
+            }
+            if (pending[0] != null && !pending[0].settled()) {
+                return false;
+            }
+            if (index[0] == 0) {
+                // Last run's frames go before this one's first, for the same reason
+                // PackEnforcement.clearStale exists: a sequence that aborts half way through
+                // must not leave older PNGs sitting beside the new ones looking current.
+                try (java.util.stream.Stream<Path> stale = Files.list(dir)) {
+                    for (Path old : stale.toList()) {
+                        Files.deleteIfExists(old);
+                    }
+                } catch (java.io.IOException noDirectory) {
+                    // Nothing to clear on the first ever run; that is the normal case.
+                }
+            }
+            SlotRoll roll = DianaController.get().roll();
+            if (roll == null) {
+                return true;
+            }
+            long now = roll.nowMillis();
+            if (!roll.activeAt(now)) {
+                return true;
+            }
+            SlotMachineHud hud = SlotMachineHud.get();
+            double travelled = hud.stripTravelled(now);
+            String[][] windows = hud.visibleStripCells(now);
+            int locked = 0;
+            StringBuilder shown = new StringBuilder(64);
+            for (int i = 0; i < windows.length; i++) {
+                if (i > 0) {
+                    shown.append(" | ");
+                }
+                String[] column = windows[i];
+                if (column.length == 1 && column[0].startsWith("LOCKED:")) {
+                    locked++;
+                }
+                for (int row = 0; row < column.length; row++) {
+                    if (row > 0) {
+                        shown.append(", ");
+                    }
+                    shown.append(column[row]);
+                }
+            }
+            String file = String.format(Locale.ROOT, "seq-%03d.png", index[0]);
+            // now is a SlotRoll clock reading and rollStartAt answers on the same clock;
+            // subtracting the wall-clock rollStartedAt here would report a number in the
+            // trillions and, worse, would have to sweep the roll to get it.
+            sequenceSamples.add(new Sample(index[0], now - roll.rollStartAt(now),
+                    roll.stateAt(now), travelled, locked, shown.toString(), file));
+            pending[0] = Shots.request(dir.resolve(file));
+            index[0]++;
+            return false;
+        });
+    }
+
+    /**
+     * Checks the sampled sequence for the two failures Evan reported, and writes it out.
+     *
+     * <p>The claim is not "the animation looks right", which no assertion can carry. It is four
+     * specific things, each of which was false of the sequence that shipped: the phase ladder
+     * never enters LOCKING or SETTLED, so there is no ordinary stop in front of the celebration;
+     * no column is landed on any frame before the first jackpot landing; the scroll figure never
+     * runs backwards, which is what a restart is; and it never advances faster than the fastest
+     * rate the machine is configured for, which is what a teleport is.</p>
+     *
+     * @return a one-line verdict for the summary
+     * @throws Exception if the sequence shows a stall, a restart or a teleport
+     */
+    private String reportSequence() throws Exception {
+        if (sequenceSamples.size() < 8) {
+            throw new IllegalStateException("only " + sequenceSamples.size()
+                    + " frames were sampled, which is too few to say anything about a sequence");
+        }
+        StringBuilder out = new StringBuilder(8192);
+        out.append("SkyPrism self test -- the roll as a sequence\n");
+        out.append("frame\tms\tphase\tcells\tcell\toffset\tlocked\tfile\twindows\n");
+
+        List<RollState> ladder = new ArrayList<>();
+        double previous = Double.NEGATIVE_INFINITY;
+        long previousMs = Long.MIN_VALUE;
+        double worstRate = 0.0d;
+        String worstRateAt = "";
+        int firstJackpotLock = Integer.MAX_VALUE;
+        String earlyLock = null;
+        String backwards = null;
+
+        for (Sample sample : sequenceSamples) {
+            if (ladder.isEmpty() || ladder.get(ladder.size() - 1) != sample.state()) {
+                ladder.add(sample.state());
+            }
+            if (sample.state() == RollState.JACKPOT_LOCK
+                    && firstJackpotLock == Integer.MAX_VALUE) {
+                firstJackpotLock = sample.index();
+            }
+            if (sample.locked() > 0 && sample.index() < firstJackpotLock && earlyLock == null) {
+                earlyLock = "frame " + sample.index() + " at " + sample.elapsed() + " ms is in "
+                        + sample.state() + " with " + sample.locked() + " column(s) already "
+                        + "landed, before the celebration landed anything";
+            }
+            if (sample.travelled() < previous && backwards == null) {
+                backwards = "frame " + sample.index() + " at " + sample.elapsed()
+                        + " ms reports the strip at " + sample.travelled()
+                        + " cells after the frame before it reported " + previous;
+            }
+            if (previousMs != Long.MIN_VALUE && sample.elapsed() > previousMs) {
+                double rate = (sample.travelled() - previous)
+                        / (double) (sample.elapsed() - previousMs);
+                if (rate > worstRate) {
+                    worstRate = rate;
+                    worstRateAt = "frame " + sample.index() + " at " + sample.elapsed() + " ms";
+                }
+            }
+            long cell = (long) Math.floor(sample.travelled());
+            out.append(sample.index()).append('\t')
+                    .append(sample.elapsed()).append('\t')
+                    .append(sample.state()).append('\t')
+                    .append(String.format(Locale.ROOT, "%.4f", sample.travelled())).append('\t')
+                    .append(cell).append('\t')
+                    .append(String.format(Locale.ROOT, "%.4f", sample.travelled() - cell))
+                    .append('\t')
+                    .append(sample.locked()).append('\t')
+                    .append(sample.file()).append('\t')
+                    .append(sample.windows()).append('\n');
+            previous = sample.travelled();
+            previousMs = sample.elapsed();
+        }
+
+        String ladderText = ladder.toString();
+        out.append("\nphase ladder: ").append(ladderText).append('\n');
+        out.append("fastest sampled scroll rate: ")
+                .append(String.format(Locale.ROOT, "%.6f", worstRate))
+                .append(" cells/ms at ").append(worstRateAt).append("; the ceiling is 1/")
+                .append((long) FASTEST_CELL_MILLIS).append(" = ")
+                .append(String.format(Locale.ROOT, "%.6f", 1.0d / FASTEST_CELL_MILLIS))
+                .append('\n');
+
+        Files.createDirectories(outDir);
+        sequenceReport = outDir.resolve("sequence").resolve("sequence-report.txt");
+        Files.createDirectories(sequenceReport.getParent());
+        Files.writeString(sequenceReport, out.toString(), StandardCharsets.UTF_8);
+
+        if (ladder.contains(RollState.LOCKING) || ladder.contains(RollState.SETTLED)) {
+            throw new IllegalStateException("the jackpot roll passed through " + ladderText
+                    + ", which contains the ordinary stop this sequence exists to remove");
+        }
+        if (earlyLock != null) {
+            throw new IllegalStateException(earlyLock);
+        }
+        if (backwards != null) {
+            throw new IllegalStateException("the strip ran backwards: " + backwards);
+        }
+        if (worstRate > 1.0d / FASTEST_CELL_MILLIS + RATE_SLACK) {
+            throw new IllegalStateException("the strip advanced at " + worstRate
+                    + " cells/ms " + worstRateAt + ", faster than the fastest rate the machine "
+                    + "is configured for; that is a teleport, not a scroll");
+        }
+        if (!ladder.contains(RollState.SPINNING) || !ladder.contains(RollState.JACKPOT_INTRO)
+                || !ladder.contains(RollState.JACKPOT_SPIN)
+                || !ladder.contains(RollState.JACKPOT_LOCK)) {
+            throw new IllegalStateException("the sequence only saw " + ladderText
+                    + ", so it did not photograph rolling -> jackpot -> rolling -> landed");
+        }
+        return sequenceSamples.size() + " frames across " + sequenceSamples
+                .get(sequenceSamples.size() - 1).elapsed() + " ms; phase ladder " + ladderText
+                + " with no LOCKING and no SETTLED, no column landed before the celebration "
+                + "landed one, the strip never ran backwards and never exceeded "
+                + String.format(Locale.ROOT, "%.6f", worstRate) + " cells/ms against a ceiling "
+                + "of " + String.format(Locale.ROOT, "%.6f", 1.0d / FASTEST_CELL_MILLIS);
+    }
+
+    // ---------------------------------------------------------------- the Chimera book
+
+    /**
+     * Asks a fresh Inquisitor roll, millisecond by millisecond, whether the Chimera book is
+     * anywhere in the three windows.
+     *
+     * <p>Exhaustive rather than sampled, because the complaint is that it has never been seen and
+     * the only answer worth giving to that is the whole timeline. Up to fifty rolls, so the count
+     * is a real answer either way; two ticks are given between starting a roll and reading it, so
+     * the widget has drawn a frame and re-resolved its strip for the new source rather than
+     * answering out of the previous roll's cache.</p>
+     */
+    private void huntChimera() {
+        int[] phase = {0};
+        int[] wait = {0};
+        long[] start = {0L};
+        program.add(() -> {
+            if (phase[0] == 0) {
+                if (chimeraSpins >= CHIMERA_MAX_SPINS) {
+                    chimeraDetail = "not once in " + CHIMERA_MAX_SPINS + " Inquisitor spins";
+                    return true;
+                }
+                chimeraSpins++;
+                DianaController.get().simulate(MythologicalCreature.MINOS_INQUISITOR,
+                        JACKPOT_DROPS);
+                wait[0] = 2;
+                phase[0] = 1;
+                return false;
+            }
+            if (phase[0] == 1) {
+                if (--wait[0] > 0) {
+                    return false;
+                }
+                phase[0] = 2;
+                return false;
+            }
+            SlotRoll roll = DianaController.get().roll();
+            SlotMachineHud hud = SlotMachineHud.get();
+            if (roll == null) {
+                chimeraDetail = "no roll to inspect";
+                return true;
+            }
+            // The walk below is anchored on the roll's own start, read off the roll's own clock.
+            // Anchoring it on System.currentTimeMillis() would make the first activeAt() call
+            // sweep the roll to IDLE and every answer after it a fiction.
+            start[0] = roll.rollStartAt(roll.nowMillis());
+            long onScreen = 0L;
+            long firstAt = -1L;
+            long firstCentreAt = -1L;
+            Set<Integer> columns = new TreeSet<>();
+            for (long offset = 0L; offset < 120_000L; offset += CHIMERA_STEP_MILLIS) {
+                long when = start[0] + offset;
+                if (!roll.activeAt(when)) {
+                    if (offset > 0L) {
+                        break;
+                    }
+                    continue;
+                }
+                String[][] windows = hud.visibleStripCells(when);
+                boolean here = false;
+                for (int i = 0; i < windows.length; i++) {
+                    String[] column = windows[i];
+                    for (int row = 0; row < column.length; row++) {
+                        if (!CHIMERA_ENTRY.equals(column[row])) {
+                            continue;
+                        }
+                        here = true;
+                        columns.add(i);
+                        if (row == 1 && firstCentreAt < 0L) {
+                            firstCentreAt = offset;
+                        }
+                    }
+                }
+                if (here) {
+                    onScreen += CHIMERA_STEP_MILLIS;
+                    if (firstAt < 0L) {
+                        firstAt = offset;
+                    }
+                }
+            }
+            chimeraLines.add("spin " + chimeraSpins + ": " + (firstAt < 0L
+                    ? "the Chimera book was never in a window"
+                    : "first in a window at " + firstAt + " ms, first in the CENTRE row at "
+                            + firstCentreAt + " ms, on screen for " + onScreen
+                            + " ms of the roll, in column(s) " + columns));
+            if (firstAt < 0L) {
+                phase[0] = 0;
+                return false;
+            }
+            chimeraFound = true;
+            chimeraFrameAt = Math.max(0L,
+                    (firstCentreAt >= 0L ? firstCentreAt : firstAt) - 60L);
+            chimeraDetail = "found on spin " + chimeraSpins + " of at most " + CHIMERA_MAX_SPINS
+                    + ": \"" + CHIMERA_ENTRY + "\" is in a reel window from " + firstAt
+                    + " ms, in the centre row from " + firstCentreAt + " ms, and stays on screen "
+                    + "for " + onScreen + " ms of the roll, across column(s) " + columns
+                    + "; the frame below is aimed at " + chimeraFrameAt + " ms";
+            return true;
+        });
+    }
+
+    /**
+     * Writes what the hunt found and fails if the book never appeared.
+     *
+     * @return the verdict, including how many spins it took
+     * @throws Exception when fifty Inquisitor spins never put the book on the drum
+     */
+    private String reportChimera() throws Exception {
+        StringBuilder out = new StringBuilder(2048);
+        out.append("SkyPrism self test -- is the Chimera book on the Inquisitor drum?\n\n");
+        out.append("Chimera is an enchantment, so the drop is an Enchanted Book and the strip\n");
+        out.append("entry is \"").append(CHIMERA_ENTRY).append("\". Every ")
+                .append(CHIMERA_STEP_MILLIS).append(" ms of each roll below was put through\n");
+        out.append("SlotMachineHud.visibleStripCells, which is the renderer's own choice of\n");
+        out.append("what to draw in each of the three rows of each column.\n\n");
+        for (String line : chimeraLines) {
+            out.append(line).append('\n');
+        }
+        out.append("\nverdict: ").append(chimeraDetail).append('\n');
+        Files.createDirectories(outDir);
+        chimeraReport = outDir.resolve("chimera-report.txt");
+        Files.writeString(chimeraReport, out.toString(), StandardCharsets.UTF_8);
+        if (!chimeraFound) {
+            throw new IllegalStateException(chimeraDetail);
+        }
+        return chimeraDetail;
+    }
+
     /** Waits until the running roll has been going for a given number of milliseconds. */
     private void awaitRoll(LongSupplier millis) {
         program.add(() -> System.currentTimeMillis() - rollStartedAt >= millis.getAsLong());
@@ -1721,6 +2437,10 @@ public final class SelfTest {
         Shots.Capture[] capture = {null};
         int[] waited = {0};
         Path target = outDir.resolve(fileName);
+        // Recorded at build time, read at run time by the step that deletes the previous run's
+        // output. buildProgram() finishes before the first tick, so that step always sees the
+        // complete list however early in the queue it sits.
+        plannedCaptures.add(fileName);
         program.add(() -> {
             if (capture[0] == null) {
                 if (when != null && !when.getAsBoolean()) {

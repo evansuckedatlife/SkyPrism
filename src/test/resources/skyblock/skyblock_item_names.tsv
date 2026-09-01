@@ -4,7 +4,7 @@
 # NotEnoughUpdates item repository -- the community's canonical SkyBlock
 # item database -- read at
 #     C:\Users\evanP\AppData\Roaming\ModrinthApp\profiles\SkyBlock Enhanced\config\notenoughupdates\repo
-# on 2026-08-31, from 8726 distinct names across its items/ directory.
+# on 2026-09-01, from 8726 distinct names across its items/ directory.
 #
 # Only the names the mod actually uses are kept. Regenerate after adding
 # one; a name this file does not carry fails the build unless it is on
@@ -53,6 +53,7 @@ ITEM	Bookworm's Favorite Book	BOOKWORM_BOOK
 ITEM	Braided Griffin Feather	BRAIDED_GRIFFIN_FEATHER
 ITEM	Brain Food	BRAIN_FOOD
 ITEM	Brick Red Dye	DYE_BRICK_RED
+ITEM	Bubba Blister	BUBBA_BLISTER
 ITEM	Bundle of Magma Arrows	ARROW_BUNDLE_MAGMA
 ITEM	Burrowing Spores	BURROWING_SPORES
 ITEM	Byzantium Dye	DYE_BYZANTIUM
@@ -73,6 +74,7 @@ ITEM	Common Sweep Booster	SWEEP_BOOSTER
 ITEM	Control Switch	CONTROL_SWITCH
 ITEM	Couture Rune	COUTURE_RUNE;1
 ITEM	Couture Rune I	COUTURE_RUNE;1
+ITEM	Coven Seal	COVEN_SEAL
 ITEM	Cretan Bull Shard	ATTRIBUTE_SHARD_MYTHOLOGICAL_RESISTANCE;1
 ITEM	Cretan Urn	CRETAN_URN
 ITEM	Crimson Essence	ESSENCE_CRIMSON
@@ -163,6 +165,7 @@ ITEM	Ephemeral Gratitude	EPHEMERAL_GRATITUDE
 ITEM	Etherwarp Conduit	ETHERWARP_CONDUIT
 ITEM	Etherwarp Merger	ETHERWARP_MERGER
 ITEM	Exceedingly Rare Ender Artifact Upgrade	EXCEEDINGLY_RARE_ENDER_ARTIFACT_UPGRADER
+ITEM	Fang-tastic Chocolate Chip	CHOCOLATE_CHIP
 ITEM	Fateful Stinger	FATEFUL_STINGER
 ITEM	Fel Pearl	FEL_PEARL
 ITEM	Fermento	FERMENTO
@@ -218,6 +221,7 @@ ITEM	Footprint Fossil	FOOTPRINT_FOSSIL
 ITEM	Forest Essence	ESSENCE_FOREST
 ITEM	Fourth Master Star	FOURTH_MASTER_STAR
 ITEM	Fragmented Cryopowder	CRYOPOWDER_SHARD
+ITEM	Frostbitten Dye	DYE_FROSTBITTEN
 ITEM	Frozen Bait	FROZEN_BAIT
 ITEM	Frozen Blaze Helmet	FROZEN_BLAZE_HELMET
 ITEM	Frozen Scute	FROZEN_SCUTE
@@ -250,6 +254,7 @@ PET	Griffin	GRIFFIN
 ITEM	Griffin Feather	GRIFFIN_FEATHER
 ITEM	Grizzly Bear Shard	ATTRIBUTE_SHARD_TOUGH_CLAWS;1
 ITEM	Grizzly Salmon	GRIZZLY_BAIT
+ITEM	Guardian Lucky Block	GUARDIAN_LUCKY_BLOCK
 ITEM	Hallowed Skull	HALLOWED_SKULL
 ITEM	Hamster Wheel	HAMSTER_WHEEL
 ITEM	Handy Blood Chalice	HANDY_BLOOD_CHALICE
@@ -276,6 +281,7 @@ ITEM	Implosion	IMPLOSION_SCROLL
 ITEM	Infernal Kuudra Core	INFERNAL_KUUDRA_CORE
 ITEM	Inferno Demonlord Shard	ATTRIBUTE_SHARD_ATTACK_SPEED;1
 ITEM	Jade Crystal	JADE_CRYSTAL
+ITEM	Jade Dye	DYE_JADE
 ITEM	Jaderald	JADERALD
 ITEM	Judgement Core	JUDGEMENT_CORE
 ITEM	Jungle Heart	JUNGLE_HEART
@@ -315,7 +321,9 @@ ITEM	Maxor's Boots	SPEED_WITHER_BOOTS
 ITEM	Maxor's Chestplate	SPEED_WITHER_CHESTPLATE
 ITEM	Maxor's Helmet	SPEED_WITHER_HELMET
 ITEM	Maxor's Leggings	SPEED_WITHER_LEGGINGS
+ITEM	McGrubber's Burger	MCGRUBBER_BURGER
 PET	Megalodon	MEGALODON
+ITEM	Midnight Dye	DYE_MIDNIGHT
 ITEM	Mineral Helmet	MINERAL_HELMET
 ITEM	Minos Hunter Shard	ATTRIBUTE_SHARD_MYTHOLOGICAL_RULER;1
 ITEM	Minos Relic	MINOS_RELIC
@@ -335,6 +343,7 @@ ITEM	Necron's Chestplate	POWER_WITHER_CHESTPLATE
 ITEM	Necron's Handle	NECRON_HANDLE
 ITEM	Necron's Helmet	POWER_WITHER_HELMET
 ITEM	Necron's Leggings	POWER_WITHER_LEGGINGS
+ITEM	Nether Star	CORRUPTED_NETHER_STAR
 ITEM	Nether Wart Distillate	NETHER_STALK_DISTILLATE
 ITEM	North Star	SKYBLOCK_NORTH_STAR
 ITEM	Not Just a Pest Vinyl	VINYL_BEETLE
@@ -395,6 +404,7 @@ ITEM	Rough Peridot Gemstone	ROUGH_PERIDOT_GEM
 ITEM	Rough Ruby Gemstone	ROUGH_RUBY_GEM
 ITEM	Rough Sapphire Gemstone	ROUGH_SAPPHIRE_GEM
 ITEM	Rough Topaz Gemstone	ROUGH_TOPAZ_GEM
+ITEM	Sangria Dye	DYE_SANGRIA
 ITEM	Sapphire Crystal	SAPPHIRE_CRYSTAL
 ITEM	Scavenged Diamond Axe	DWARVEN_DIAMOND_AXE
 ITEM	Scavenged Emerald Hammer	DWARVEN_EMERALD_HAMMER
@@ -426,6 +436,8 @@ ITEM	Snow Suit Helmet	SNOW_SUIT_HELMET
 ITEM	Snow Suit Leggings	SNOW_SUIT_LEGGINGS
 ITEM	Sorrow	SORROW
 TROPHY	Soul Fish	SOUL_FISH
+ITEM	Soultwist Rune	SOULTWIST_RUNE;1
+ITEM	Soultwist Rune I	SOULTWIST_RUNE;1
 ITEM	Space Helmet	DCTR_SPACE_HELM
 ITEM	Sphinx Shard	ATTRIBUTE_SHARD_BIG_GAME_HUNTER;1
 ITEM	Spider Catalyst	SPIDER_CATALYST
@@ -434,6 +446,7 @@ ITEM	Spine Fossil	SPINE_FOSSIL
 ITEM	Spirit Rune	SPIRIT_RUNE;1
 ITEM	Spirit Rune I	SPIRIT_RUNE;1
 ITEM	Spirit Sceptre	BAT_WAND
+ITEM	Spooky Fragment	SPOOKY_SHARD
 ITEM	Squash	SQUASH
 ITEM	Squeaky Toy	SQUEAKY_TOY
 PET	Squid	SQUID
@@ -470,6 +483,7 @@ ITEM	Twilight Arrow Poison	TWILIGHT_ARROW_POISON
 ITEM	Ugly Fossil	UGLY_FOSSIL
 ITEM	Undead Catalyst	UNDEAD_CATALYST
 ITEM	Undead Essence	ESSENCE_UNDEAD
+ITEM	Unfanged Vampire Part	UNFANGED_VAMPIRE_PART
 TROPHY	Vanille	VANILLE
 ITEM	Vial of Venom	VIAL_OF_VENOM
 ITEM	Vinesap	VINESAP

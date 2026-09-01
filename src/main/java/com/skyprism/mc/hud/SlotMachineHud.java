@@ -4,6 +4,7 @@ import com.skyprism.core.config.SkyPrismConfig;
 import com.skyprism.core.diana.LootDrop;
 import com.skyprism.core.diana.MythologicalCreature;
 import com.skyprism.core.diana.Reel;
+import com.skyprism.core.diana.ReelScroll;
 import com.skyprism.core.diana.RollState;
 import com.skyprism.core.diana.SlotRoll;
 import com.skyprism.core.loot.LootEvent;
@@ -64,9 +65,12 @@ import java.util.List;
  * lets the timing be unit-tested without a game, and it means this class never re-derives when
  * a reel locks -- it reads {@link Reel#locked()} and believes it. What this file owns is
  * presentation: the fade-out alpha, the vertical scroll of the strip, and the whole look of the
- * jackpot act. All of it is read off wall-clock millis rather than off a frame counter or an
- * accumulator, so a 30 fps laptop and a 240 fps desktop see the same animation at the same
- * speed, and a dropped frame cannot drift one effect out of phase with another.
+ * jackpot act. All of it is a pure function of the roll's clock rather than of a frame counter
+ * or a per-frame accumulator, so a 30 fps laptop and a 240 fps desktop see the same animation at
+ * the same speed, and a dropped frame cannot drift one effect out of phase with another. The
+ * strip's scroll integrates a rate rather than dividing the clock ({@link ReelScroll}) -- it has
+ * to, because the rate changes mid-roll -- but it integrates it closed-form from the roll's own
+ * start instant, so it is still one instant in and one number out.
  *
  * <h2>The performance contract</h2>
  *
@@ -327,10 +331,11 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
      * <p>The scroll is presentation, so it is owned here rather than read off
      * {@link Reel#spinPhase()}. Two reasons. The strip's content index has to advance by
      * exactly one at the instant the offset wraps, and a phase alone cannot say how many wraps
-     * have happened -- deriving both from the same wall-clock division makes them the same
-     * number by construction. And the jackpot re-spin has to visibly run faster than the first
-     * spin, which a single core-owned phase cannot express. The core still owns the thing that
-     * matters, which is <em>when a reel locks</em>.</p>
+     * have happened -- taking both from the floor and the fraction of one travelled-distance
+     * number makes them the same number by construction. And the jackpot re-spin has to visibly
+     * run faster than the first spin, which a single core-owned phase cannot express. The core
+     * still owns the two things that matter, which are <em>when a reel locks</em> and
+     * <em>when the speed changes</em>; this is only the rate. See {@link ReelScroll}.</p>
      */
     private static final long STRIP_CELL_MILLIS = 150L;
 
@@ -348,8 +353,35 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
      */
     private static final long JACKPOT_CELL_MILLIS = 65L;
 
-    /** Per-column offset, so the three drums are not in lockstep. */
-    private static final long REEL_STRIP_OFFSET_MILLIS = 50L;
+    /**
+     * Per-column head start, in cells, so the three drums are not in lockstep.
+     *
+     * <p>Measured in cells rather than in milliseconds, which is what the two speeds force. A
+     * millisecond offset means one thing at 150ms per cell and a different thing at 65ms, so the
+     * columns' relationship to each other changed on the frame the celebration opened -- three
+     * drums that had been a third of a cell apart snapped to nearly three quarters. In cells the
+     * separation is the same at any speed.
+     *
+     * <p>The whole part is three, which is the de-correlation that matters: it decides <em>which</em>
+     * symbol each drum is showing, and three is coprime to nothing in particular but is large enough
+     * that neighbouring columns are never showing neighbouring entries. The third is the visual
+     * part: it staggers where in its travel each column is, so the three do not wrap on the same
+     * frame.
+     */
+    private static final double REEL_STRIP_LEAD_CELLS = 3.0 + 1.0 / 3.0;
+
+    /**
+     * How many cells must pass after the celebration opens before the prize starts appearing on
+     * the strip.
+     *
+     * <p>Two, because the window shows three rows and new content enters at the bottom one: from
+     * the third cell on, every cell the strip reveals is one the player had not already seen. Zero
+     * would rewrite the cells currently on screen -- half the visible strip changing item on the
+     * frame the gold arrives, which is precisely the kind of snap this rework exists to remove --
+     * so the prize scrolls in instead, and within a couple of cells at act two's speed it is
+     * flashing past on every other row.
+     */
+    private static final long PRIZE_LEAD_CELLS = 2L;
 
     // The symbols a reel scrolls before it locks live in FillerStrip, one strip per LootSource.
     // They were one static array here for as long as the machine was Diana's alone, which is
@@ -1204,6 +1236,22 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
         // the roll. A dungeon chest scrolls dungeon chest drops and a trophy fish scrolls fish.
         FillerStrip strip = strip(current, now);
 
+        // How far the drums have turned since this roll began, as one continuous number that
+        // accelerates when the celebration opens instead of restarting there. Read once for the
+        // frame and offset per column, exactly like `now` itself: three columns deriving it
+        // separately would be three chances to sample a different instant.
+        long rollStart = current.rollStartAt(now);
+        long actTwoStart = current.jackpotActStartAt(now);
+        double travelled = ReelScroll.cellsTravelled(now, rollStart, actTwoStart,
+                STRIP_CELL_MILLIS, JACKPOT_CELL_MILLIS);
+        // Where the drums stood when the gold arrived, which is what the prize is spliced in
+        // behind. Evaluating cellsTravelled at the boundary rather than remembering it on the
+        // frame the boundary was noticed keeps the splice on a cell edge instead of on whatever
+        // fraction of a cell the first act-two frame happened to land on.
+        double travelledAtActTwo = actTwoStart == SlotRoll.NO_ACT_TWO ? 0.0
+                : ReelScroll.cellsTravelled(actTwoStart, rollStart, actTwoStart,
+                        STRIP_CELL_MILLIS, JACKPOT_CELL_MILLIS);
+
         // The item a jackpot converges on. Null outside the second act, which is what keeps the
         // ordinary roll's strip generic and its windows plain.
         LootDrop jackpotDrop = isJackpotAct(state) ? current.jackpotSymbolAt(now) : null;
@@ -1225,8 +1273,8 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
         for (int i = 0; i < reels.size(); i++) {
             int left = PADDING + i * (REEL_WIDTH + REEL_GAP);
             drawReel(graphics, font, reels.get(i), labels[i], left, PADDING, alpha, nameSize,
-                    names, now, state, gold, wave, hot, jackpotIcon, jackpotLabel, jackpotKey,
-                    strip);
+                    names, now, gold, wave, hot, jackpotIcon, jackpotLabel, jackpotKey,
+                    strip, travelled, travelledAtActTwo);
         }
 
         // The third match, lighting the whole machine rather than one window. It is the only
@@ -1382,9 +1430,9 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
      */
     private void drawReel(GuiGraphicsExtractor graphics, Font font, Reel reel, String label,
                           int left, int top, int alpha, float nameSize, boolean names,
-                          long now, RollState state, double gold, double wave, int hot,
+                          long now, double gold, double wave, int hot,
                           ItemStack jackpotIcon, String jackpotLabel, String jackpotKey,
-                          FillerStrip strip) {
+                          FillerStrip strip, double travelled, double travelledAtActTwo) {
         int right = left + REEL_WIDTH;
         int bottom = top + REEL_HEIGHT;
         // When the names are switched off the cell keeps its full height -- the panel must not
@@ -1439,8 +1487,8 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
         // rather than sitting on it in the ordinary roll's cool grey.
         int stripRgb = gold > 0.0 ? lerpRgb(FILLER_RGB, JACKPOT_GOLD, gold) : FILLER_RGB;
         drawSpinningReel(graphics, font, reel, left, top, right, bottom, cellTop, alpha,
-                nameSize, names, now, state, jackpotIcon, jackpotLabel, jackpotKey, stripRgb,
-                strip);
+                nameSize, names, now, jackpotIcon, jackpotLabel, jackpotKey, stripRgb,
+                strip, travelled, travelledAtActTwo);
 
         // A dimmed frame, so a spinning column is still recognisably one of three windows.
         // Without it the machine has no windows at all until the first reel stops, and the
@@ -1450,38 +1498,80 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
     }
 
     /**
+     * The cell drawn in the middle row of a column's window, as one whole number.
+     *
+     * <p>Shared by the renderer and by {@link #visibleStripCells(long)} so the self test cannot
+     * report a window the frame did not draw. The per-column lead is folded in here rather than
+     * at the two call sites for the same reason.</p>
+     *
+     * @param travelled  how far the drums have turned since the roll began, in cells
+     * @param reelIndex  which column, from zero
+     * @return the middle row's slot number
+     */
+    private static long firstVisibleCell(double travelled, int reelIndex) {
+        return (long) Math.floor(travelled + reelIndex * REEL_STRIP_LEAD_CELLS);
+    }
+
+    /**
+     * The first slot in a column that is allowed to carry the jackpot's own item.
+     *
+     * @param travelledAtActTwo where the drums stood when the celebration opened, in cells
+     * @param reelIndex         which column, from zero
+     * @return the earliest slot the prize may be spliced into
+     */
+    private static long firstPrizeCell(double travelledAtActTwo, int reelIndex) {
+        return (long) Math.floor(travelledAtActTwo + reelIndex * REEL_STRIP_LEAD_CELLS)
+                + PRIZE_LEAD_CELLS;
+    }
+
+    /**
      * The scrolling strip.
      *
      * <p>Both the sub-cell offset and the index of the symbol in each row come out of the same
-     * division of wall-clock millis by the cell period, so the content advances by exactly one
+     * travelled distance -- its fraction and its floor -- so the content advances by exactly one
      * at the instant the offset wraps and the strip is seamless. Deriving the offset from
      * {@link Reel#spinPhase()} and the index from anything else cannot have that property, and
      * the symptom -- a sprite changing halfway through its travel -- is far more obvious with a
      * 32-pixel item than it ever was with a line of text.</p>
      *
-     * <p>From the first instant of the second act the period is less than half as long, and
-     * every other cell is the jackpot's own item, so the symbol the reels are about to land on
-     * keeps flashing past. That is what a slot machine looks like when it is about to pay. It
-     * begins at the top of {@link RollState#JACKPOT_INTRO} rather than at
-     * {@link RollState#JACKPOT_SPIN}, because the columns are already turning under the gold
-     * wash and drawing them at act one's speed there made the wash look like a pause.</p>
+     * <p><b>Why a distance and not a division.</b> Both numbers used to come out of dividing the
+     * wall clock by the cell period, which has the wrap property too and is simpler -- right up
+     * to the frame the period changes. On that frame a clock in the trillions divided by 65
+     * instead of 150 jumped some thousands of cells and the remainder became a fraction of a
+     * different period, so the strip teleported: new symbols, new offset, one frame, under a gold
+     * wash. {@link ReelScroll} integrates the rate from the roll's own start instead, so the
+     * speed-up is a change of slope. Nothing in this method reads the clock or the phase.</p>
+     *
+     * <p>From the first instant of the second act the rate is more than twice as fast, and every
+     * other <em>arriving</em> cell is the jackpot's own item, so the symbol the reels are about to
+     * land on keeps flashing past. That is what a slot machine looks like when it is about to pay.
+     * The prize is spliced in behind the cells already on screen rather than over them, for the
+     * same reason the scroll is continuous: half the visible strip changing item on one frame is
+     * the snap, whatever caused it.</p>
      */
     private static void drawSpinningReel(GuiGraphicsExtractor graphics, Font font, Reel reel,
                                          int left, int top, int right, int bottom, int cellTop,
                                          int alpha, float nameSize, boolean names, long now,
-                                         RollState state, ItemStack jackpotIcon,
+                                         ItemStack jackpotIcon,
                                          String jackpotLabel, String jackpotKey, int stripRgb,
-                                         FillerStrip strip) {
-        long period = isJackpotAct(state) ? JACKPOT_CELL_MILLIS : STRIP_CELL_MILLIS;
-        long t = now + (long) reel.index() * REEL_STRIP_OFFSET_MILLIS;
-        long cell = Math.floorDiv(t, period);
-        double phase = Math.floorMod(t, period) / (double) period;
+                                         FillerStrip strip, double travelled,
+                                         double travelledAtActTwo) {
+        double distance = travelled + reel.index() * REEL_STRIP_LEAD_CELLS;
+        long cell = firstVisibleCell(travelled, reel.index());
+        double phase = distance - cell;
 
-        int offset = (int) Math.round(phase * STRIP_PITCH);
+        // Floored rather than rounded: rounding lets the last sliver of a cell report a full
+        // pitch, which draws the strip one whole cell low for a frame without advancing its
+        // content -- the one-frame version of exactly the discontinuity this method is about.
+        int offset = (int) (phase * STRIP_PITCH);
         int base = cellTop - offset;
-        // The extra per-column term de-correlates *which* symbols the three drums are showing;
-        // the millisecond offset above only de-correlates where they are in their travel.
-        int index = (int) cell + reel.index() * 3;
+
+        // The first cell allowed to carry the prize. Behind the bottom row, so the splice happens
+        // to content the player has not seen yet; Long.MAX_VALUE while there is no prize, which
+        // takes the comparison below out of play without a null test per row.
+        long prizeFrom = jackpotIcon == null
+                ? Long.MAX_VALUE
+                : firstPrizeCell(travelledAtActTwo, reel.index());
 
         String[] fillerNames = strip.names();
         ItemStack[] fillers = strip.icons(now);
@@ -1495,9 +1585,9 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
         graphics.enableScissor(left, top, right, bottom);
         try {
             for (int row = -1; row <= 1; row++) {
-                int slot = index + row;
-                boolean prize = jackpotIcon != null && (Math.floorMod(slot, 2) == 0);
-                int pick = Math.floorMod(slot, fillerNames.length);
+                long slot = cell + row;
+                boolean prize = slot >= prizeFrom && Math.floorMod(slot, 2L) == 0L;
+                int pick = (int) Math.floorMod(slot, (long) fillerNames.length);
                 ItemStack icon = prize ? jackpotIcon : fillers[pick];
                 String name = prize ? jackpotLabel : fillerNames[pick];
                 String key = prize ? jackpotKey : fillerNames[pick];
@@ -2402,6 +2492,87 @@ public final class SlotMachineHud implements HudElement, SkyPrismServices.Hud {
     @Override
     public List<String> symbolNames() {
         return FillerStrip.allNames();
+    }
+
+    /**
+     * How far this roll's drums have turned, in cells, at an instant.
+     *
+     * <p>The self test's answer to "did the strip stall". It is the very number
+     * {@code drawFrame} hands the columns -- {@link ReelScroll#cellsTravelled} over the roll's
+     * own start and act-two boundary -- so a report built from it describes the frame that was
+     * photographed rather than a second model of it.</p>
+     *
+     * @param now the instant to evaluate, on the roll's own clock
+     * @return cells travelled since the roll began, or -1 when nothing is rolling
+     */
+    public double stripTravelled(long now) {
+        SlotRoll current = this.roll;
+        if (current == null || !current.activeAt(now)) {
+            return -1.0d;
+        }
+        long rollStart = current.rollStartAt(now);
+        long actTwoStart = current.jackpotActStartAt(now);
+        return ReelScroll.cellsTravelled(now, rollStart, actTwoStart,
+                STRIP_CELL_MILLIS, JACKPOT_CELL_MILLIS);
+    }
+
+    /**
+     * The three cells each column is showing right now, top row first.
+     *
+     * <p>Built from {@link #firstVisibleCell} and {@link #firstPrizeCell} -- the same two
+     * methods {@code drawSpinningReel} uses to choose what to draw -- over the same
+     * {@link FillerStrip} the frame resolved, so this is a read of the window rather than a
+     * reconstruction of it. A landed column reports its own symbol once, prefixed
+     * {@code LOCKED:}, because a locked window is not scrolling anything.</p>
+     *
+     * <p>Debug-only: nothing on the render path calls it and it allocates, which is why it is
+     * not folded into the draw itself.</p>
+     *
+     * @param now the instant to evaluate, on the roll's own clock
+     * @return one array per column; empty when nothing is rolling
+     */
+    public String[][] visibleStripCells(long now) {
+        SlotRoll current = this.roll;
+        if (current == null || !current.activeAt(now)) {
+            return new String[0][];
+        }
+        RollState state = current.stateAt(now);
+        List<Reel> reels = current.reelsAt(now);
+        FillerStrip resolved = strip(current, now);
+        long rollStart = current.rollStartAt(now);
+        long actTwoStart = current.jackpotActStartAt(now);
+        double travelled = ReelScroll.cellsTravelled(now, rollStart, actTwoStart,
+                STRIP_CELL_MILLIS, JACKPOT_CELL_MILLIS);
+        double travelledAtActTwo = actTwoStart == SlotRoll.NO_ACT_TWO ? 0.0d
+                : ReelScroll.cellsTravelled(actTwoStart, rollStart, actTwoStart,
+                        STRIP_CELL_MILLIS, JACKPOT_CELL_MILLIS);
+        LootDrop jackpotDrop = isJackpotAct(state) ? current.jackpotSymbolAt(now) : null;
+        String prizeName = jackpotDrop == null ? null : jackpotDrop.itemName();
+        String[] fillerNames = resolved.names();
+        String[][] windows = new String[reels.size()][];
+        for (int i = 0; i < reels.size(); i++) {
+            Reel reel = reels.get(i);
+            if (reel.locked()) {
+                LootDrop landed = reel.symbol();
+                windows[i] = new String[] {
+                        "LOCKED:" + (landed == null ? "(none)" : landed.itemName()) };
+                continue;
+            }
+            long cell = firstVisibleCell(travelled, reel.index());
+            long prizeFrom = jackpotDrop == null
+                    ? Long.MAX_VALUE
+                    : firstPrizeCell(travelledAtActTwo, reel.index());
+            String[] rows = new String[3];
+            for (int row = -1; row <= 1; row++) {
+                long slot = cell + row;
+                boolean prize = slot >= prizeFrom && Math.floorMod(slot, 2L) == 0L;
+                rows[row + 1] = prize
+                        ? prizeName
+                        : fillerNames[(int) Math.floorMod(slot, (long) fillerNames.length)];
+            }
+            windows[i] = rows;
+        }
+        return windows;
     }
 
     /** @return the widget's unscaled footprint as {@code [width, height]} */

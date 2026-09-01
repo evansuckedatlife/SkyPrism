@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -189,8 +190,13 @@ final class SlotMachineFillerMcTest {
         // uses precisely because they claim nothing about where a roll came from. Anything else is
         // another source's loot table leaking in, which is what "a fishing reel scrolling Daedalus
         // Sticks" was.
+        //
+        // The pool, not the jackpot list: widening a strip to the ordinary drops is what put the
+        // Griffin Feather and the Ancient Claw back on Diana's reel. The invariant is unchanged --
+        // a strip may only carry its own source's loot -- only what counts as "its own" is now
+        // "anything that source drops" rather than "anything worth celebrating".
         Set<String> allowed = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        allowed.addAll(LootSourceRegistry.info(source).jackpotItems());
+        allowed.addAll(LootSourceRegistry.dropPool(source));
         allowed.addAll(FillerStrip.genericTopUp());
 
         List<String> borrowed = new ArrayList<>();
@@ -216,6 +222,168 @@ final class SlotMachineFillerMcTest {
                         + diana);
         assertTrue(FillerStrip.of(LootSource.POWDER_CHEST).nameList().contains("Control Switch"),
                 "Control Switch belongs on the Powder Chest's strip, not nowhere");
+    }
+
+    // ======================================================================
+    //  The complaint: "I haven't once seen the chimera book rolling inside the
+    //  inquisitor animation"
+    // ======================================================================
+
+    @Test
+    @DisplayName("the Inquisitor's Chimera book is on Diana's strip, as a glinted enchanted book")
+    void theChimeraBookScrollsOnDiana() {
+        // Chimera is an ULTIMATE ENCHANTMENT, so what the Minos Inquisitor drops at 1% is an
+        // Enchanted Book whose lore reads "Chimera I". There is no plain "Chimera" item, NEU has
+        // none, and Hypixel's own resource pack ships no enchanted-book art at all -- so a glinted
+        // vanilla enchanted book is not a fallback here, it is the correct picture, and the caption
+        // is what carries the word. The failure this pins is the drop being absent from the reel,
+        // not the sprite being wrong.
+        List<String> diana = FillerStrip.of(LootSource.DIANA_MYTHOLOGICAL).nameList();
+        assertTrue(diana.contains("Chimera I"),
+                () -> "the Minos Inquisitor's rarest drop is not on the strip its own animation "
+                        + "scrolls, which is exactly what was reported: " + diana);
+
+        ItemStack book = DropSymbols.iconForName("Chimera I");
+        assertFalse(book.isEmpty(), "Chimera I draws nothing at all");
+        assertEquals("minecraft:enchanted_book",
+                BuiltInRegistries.ITEM.getKey(book.getItem()).toString(),
+                "Chimera drops as an Enchanted Book, so that is what the cell has to draw");
+        // enchanted_book carries enchantment_glint_override=true as a DEFAULT component on both
+        // 26.1.2 and 26.2, so the shimmer is there without the row asking for it -- which is why
+        // drop_symbols.json must never try to separate two book rows by glint.
+        assertTrue(book.getItem().components()
+                        .has(DataComponents.ENCHANTMENT_GLINT_OVERRIDE),
+                "the book has to shimmer, or it reads as an ordinary book on the reel");
+
+        // Every tier Hypixel can print, and the parenthetical form the banner uses, land on the
+        // same picture rather than on the fallback chest.
+        for (String spelling : List.of("Chimera", "Chimera I", "Chimera V",
+                "Enchanted Book (Chimera I)", "Enchanted Book")) {
+            assertSame(book, DropSymbols.iconForName(spelling),
+                    () -> spelling + " does not resolve to the same enchanted book");
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(LootSource.class)
+    @DisplayName("a roll can show every symbol on the strip, so nothing is invisible for ever")
+    void everySymbolFitsInsideOneRoll(LootSource source) {
+        // The arithmetic is on FillerStrip.WINDOW: three reels, 150 ms cells, a 1200 ms spin and a
+        // 250 ms stagger put exactly twenty-one consecutive strip indices on screen during a roll.
+        // A strip longer than that hands the choice of which symbols appear to the wall clock, and
+        // that is how a drop that has been on Diana's strip all along was never once seen. The pool
+        // may be as wide as the wiki says; the drum may not.
+        int length = FillerStrip.of(source).nameList().size();
+        assertTrue(length <= FillerStrip.WINDOW,
+                () -> source + "'s reel strip is " + length + " long, so a roll shows only "
+                        + FillerStrip.WINDOW + " of it and which " + FillerStrip.WINDOW + " is "
+                        + "decided by the wall clock rather than by anything a player can see");
+    }
+
+    @ParameterizedTest
+    @EnumSource(LootSource.class)
+    @DisplayName("no source's whole drop pool is invented, unmapped, or doubled onto one picture")
+    void theWholePoolIsDrawable(LootSource source) {
+        // The strip is a window onto the pool, so the checks above only ever see part of it. These
+        // are the same two guarantees applied to the rest, because a window is re-cut whenever the
+        // pool changes and a name that is broken today is a fallback chest the day it is picked.
+        List<String> pool = LootSourceRegistry.dropPool(source);
+        List<String> unmapped = new ArrayList<>();
+        for (String name : pool) {
+            if (!DropSymbols.hasMapping(name)) {
+                unmapped.add(name);
+            }
+        }
+        assertEquals(List.of(), unmapped,
+                () -> "these drops of " + source + " have no row in drop_symbols.json: " + unmapped);
+        assertNoSpriteRepeats(pool, source + "'s drop pool");
+    }
+
+    @Test
+    @DisplayName("the sources a player actually grinds carry their own loot, not generic filler")
+    void thePlayedSourcesAreProperlyStocked() {
+        // A floor, not a target. Ten is FillerStrip.MIN_LENGTH, so a source below it is one whose
+        // reel is majority enchanted material -- honest for a source nobody has researched, and an
+        // admission of nothing having been written down for a source somebody plays every day.
+        Map<LootSource, Integer> thin = new LinkedHashMap<>();
+        for (LootSource source : List.of(LootSource.DIANA_MYTHOLOGICAL, LootSource.SLAYER_BOSS,
+                LootSource.FISHING_RARE_SEA_CREATURE, LootSource.POWDER_CHEST,
+                LootSource.DUNGEON_REWARD_CHEST, LootSource.GARDEN_PEST_DROP,
+                LootSource.CRYSTAL_NUCLEUS_RUN, LootSource.GLACITE_CORPSE)) {
+            int own = LootSourceRegistry.dropPool(source).size();
+            if (own < FillerStrip.MIN_LENGTH) {
+                thin.put(source, own);
+            }
+        }
+        assertEquals(Map.of(), thin,
+                () -> "these are the sources this mod is actually used on, and their drop tables "
+                        + "are still thin enough that the reel pads itself out with enchanted "
+                        + "material: " + thin);
+    }
+
+    @Test
+    @DisplayName("Diana scrolls the two drops a Diana player would name first")
+    void dianaScrollsItsCommonestLoot() {
+        // Both were missing for a structural reason worth recording: the strip used to be the
+        // JACKPOT list, and JackpotRule excludes the Griffin Feather (about two thirds of all
+        // burrow treasure) and the Ancient Claw by name, because celebrating a drop that common
+        // would empty the flourish of meaning. Correct about the flourish; it deleted from the drum
+        // the two things that make it read as a Diana machine.
+        List<String> diana = FillerStrip.of(LootSource.DIANA_MYTHOLOGICAL).nameList();
+        assertTrue(diana.contains("Griffin Feather"),
+                () -> "the single most recognisable Diana drop is not on Diana's reel: " + diana);
+        assertTrue(diana.contains("Ancient Claw"),
+                () -> "every mythological creature pays the Ancient Claw and the reel never shows "
+                        + "one: " + diana);
+    }
+
+    @Test
+    @DisplayName("a slayer strip speaks for all six bosses, not for whichever one sorts first")
+    void theSlayerStripCoversEveryBoss() {
+        // One LootSource carries six slayers' tables, so an alphabetical window would have shown a
+        // Voidgloom roll nothing but dyes and Etherwarp parts. FillerStrip.SIGNATURES is what stops
+        // that; this is the assertion that it is still doing it.
+        List<String> slayer = FillerStrip.of(LootSource.SLAYER_BOSS).nameList();
+        Map<String, String> signature = new LinkedHashMap<>();
+        signature.put("Voidgloom Seraph", "Judgement Core");
+        signature.put("Revenant Horror", "Warden Heart");
+        signature.put("Tarantula Broodfather", "Tarantula Talisman");
+        signature.put("Sven Packmaster", "Overflux Capacitor");
+        signature.put("Inferno Demonlord", "Archfiend Dice");
+        signature.put("Riftstalker Bloodfiend", "Handy Blood Chalice");
+        List<String> silent = new ArrayList<>();
+        signature.forEach((boss, drop) -> {
+            if (!slayer.contains(drop)) {
+                silent.add(boss + " (" + drop + ")");
+            }
+        });
+        assertEquals(List.of(), silent,
+                () -> "the slayer reel says nothing about these bosses: " + silent + ". Strip: "
+                        + slayer);
+    }
+
+    @Test
+    @DisplayName("every pinned signature is a drop its source really pays")
+    void noSignaturePinsLootThatIsNotThere() {
+        // The pin can only choose what is shown; it must never be able to put loot on a machine.
+        // If a name here has gone stale the window silently loses a slot to nothing, which is the
+        // quiet half of this failure and the reason it is asserted rather than trusted.
+        Map<LootSource, List<String>> stale = new LinkedHashMap<>();
+        FillerStrip.signaturesForTest().forEach((source, names) -> {
+            Set<String> pool = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+            pool.addAll(LootSourceRegistry.dropPool(source));
+            List<String> missing = new ArrayList<>();
+            for (String name : names) {
+                if (!pool.contains(name)) {
+                    missing.add(name);
+                }
+            }
+            if (!missing.isEmpty()) {
+                stale.put(source, missing);
+            }
+        });
+        assertEquals(Map.of(), stale,
+                () -> "FillerStrip.SIGNATURES pins names these sources no longer drop: " + stale);
     }
 
     @Test

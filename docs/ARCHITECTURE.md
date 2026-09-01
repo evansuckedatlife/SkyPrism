@@ -316,16 +316,38 @@ knows what a frame is.
    |<---------------- lootWindowMillis: offerDrop is accepted -------->|
 ```
 
-Defaults (`SlotRollConfig.defaults()`): 3 reels, 1200 ms spin, 250 ms stagger, 3000 ms loot
-window, 2500 ms settle, 500 ms fade, 900 ms extra spin on a jackpot.
+That is the ordinary roll. A roll that captured a rare drop branches off at `reel 0 locks` and
+never reaches the stagger or the settle at all — it keeps spinning into the celebration instead:
 
-Two things about it are worth calling out:
+```
+   |<----- spinMillis ----->|
+   |                        |<- intro ->|<-- spin -->|<- stagger x2 ->|<--- hold --->|<- fade ->|
+   |  SPINNING              | JACKPOT_INTRO | JACKPOT_SPIN | JACKPOT_LOCK | JACKPOT_HOLD | FADING
+   |                        ^
+   |                        the reels do not stop here; the gold arrives over them
+```
+
+The branch point is `SlotRoll.jackpotActStartAt(now)`. It used to be the end of the settle, which
+meant a lucky roll locked its three reels, held them still for 2.5 seconds and then broke them
+loose again — a visible dead stop and restart in the middle of the build. A banner Hypixel printed
+after some columns had already landed moves the branch point to the banner, which is the only
+shape in which a celebrating roll passes through `LOCKING` or `SETTLED` at all.
+
+Defaults (`SlotRollConfig.defaults()`): 3 reels, 1200 ms spin, 250 ms stagger, 3000 ms loot
+window, 2500 ms settle, 500 ms fade; and on the jackpot branch 600 ms gold wash, 900 ms further
+spin, 280 ms between landings, 2200 ms hold.
+
+Three things about it are worth calling out:
 
 - **A reel shows only what had arrived by the moment it locked.** `reelsAt(now)` recomputes
   every reel's symbol from the captures whose `atMillis` is at or before that reel's lock
   time. Reels are ranked (rare first, then by descending count, then by arrival order) and
   each reel prefers a symbol not already shown, falling back to `reelIndex % visible`. With
   nothing captured, a locked reel shows `SlotRoll.NO_DROP` ("No Drop").
+- **A rare drop is never a landed act-one symbol.** It cannot be: capturing one moves the roll
+  onto the jackpot branch at the first lock instant, so every column converges on it instead of
+  one column landing on it. The rare-first half of the ranking is therefore observable through
+  `jackpotSymbol()` rather than through `reelsAt`.
 - **Every arithmetic operation on the timeline is overflow-clamped.** `addClamped` saturates
   instead of wrapping, and window checks are written as `now > start + window` rather than
   `now - start > window`, so a clock far from zero cannot reopen a window that has shut.
@@ -337,6 +359,16 @@ Two things about it are worth calling out:
 frame is `roll.activeAt(now)`; when that is false it records a skip in `Metrics` and returns.
 All the animation the HUD owns is presentation only — fade alpha, the jackpot breath, the
 shine sweep, sparks — driven from the same wall clock, never from state the engine holds.
+
+The one exception in shape, though not in principle, is the reel strip's scroll. It cannot be a
+clock division, because the cell period changes when the celebration opens and a division by a
+changing period teleports on that frame: 1200 ms read 8 cells at 150 ms each and 18 at 65 ms.
+`core/diana/ReelScroll` integrates the rate instead — closed-form, from `rollStartAt(now)`, with
+the slope changing at `jackpotActStartAt(now)` — so it is still one instant in and one number
+out, and the strip's content index and pixel offset are that number's floor and fraction. Its
+continuity is pinned by `ReelScrollTest`, which walks a whole jackpot roll a millisecond at a
+time and asserts the scroll never runs backwards, never stalls and never advances by more than
+one fast millisecond's worth in one millisecond.
 
 **One accuracy note on the jackpot.** The flourish is driven by `SlotRoll.jackpot()`, which
 becomes true when any captured `LootDrop` has `rare() == true`. On the live path

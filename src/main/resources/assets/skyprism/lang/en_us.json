@@ -212,7 +212,7 @@
   "skyprism.config.diana.fade": "Fade out",
   "skyprism.config.diana.fade.desc": "How long the fade itself takes.",
   "skyprism.config.diana.group.jackpot_timing": "Jackpot celebration",
-  "skyprism.config.diana.group.jackpot_timing.desc": "A jackpot no longer changes the ordinary spin at all. The reels lock on the real drops and settle exactly as they always do, and only then does a second act begin: gold washes over the result, all three reels spin up again, and they land one at a time on the same item. These four times pace that second act, and none of them costs anything on a kill that does not pay out.",
+  "skyprism.config.diana.group.jackpot_timing.desc": "A jackpot changes nothing about the spin until the reels would have started landing -- and then they do not land at all. Gold washes over columns that are still turning, they keep turning faster, and they come to rest one at a time on the same item, so the whole roll is one movement with a single stop at the end. These four times pace that second act, and none of them costs anything on a kill that does not pay out.",
   "skyprism.config.diana.jackpot_intro": "Gold wash",
   "skyprism.config.diana.jackpot_intro.desc": "How long the gold takes to wash in. The reels break loose again at the start of it, so the machine turns gold while it is already spinning rather than pausing to change colour first. Zero makes the gold snap on.",
   "skyprism.config.diana.jackpot_spin": "Jackpot re-spin",
@@ -225,7 +225,7 @@
   "skyprism.config.diana.allowed_areas": "Islands",
   "skyprism.config.diana.allowed_areas.desc": "Islands the slot machine is allowed to run on, read from the sidebar. Empty means anywhere, which is the default. Filling it in stops a rare drop from unrelated content -- a slayer, a dungeon run -- being credited to Diana when it lands shortly after a burrow.",
   "skyprism.config.diana.jackpot_items": "Jackpot items",
-  "skyprism.config.diana.jackpot_items.desc": "Drops that earn the jackpot celebration: once the ordinary roll has settled, all three reels spin up again and land on this item, three of a kind. Names are matched ignoring case, without colour codes. Blank rows are dropped when you save.",
+  "skyprism.config.diana.jackpot_items.desc": "Drops that earn the jackpot celebration: instead of landing on the real loot the reels roll straight on into gold and land together on this item, three of a kind. Names are matched ignoring case, without colour codes. Blank rows are dropped when you save.",
 
   "_comment_loot": "The SkyBlock-wide slot machine: one landing tab, then one tab per part of the game.",
 

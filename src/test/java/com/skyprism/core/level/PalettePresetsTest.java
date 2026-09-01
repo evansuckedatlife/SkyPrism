@@ -63,29 +63,42 @@ class PalettePresetsTest {
     private static final int TOP_TIER_LEVEL = 480;
 
     /**
-     * The floor adjacent SkyPrism bands hold, derived from what the sweep actually yields.
+     * The floor every pair of brackets involving a SkyPrism colour holds -- <b>every</b> pair,
+     * near or far, not just neighbours.
      *
-     * <p>Measured worst neighbour gap across levels 480..600 is 0.119 in Oklab, so this bar
-     * sits just under it: a hue or lightness edit that meaningfully closes the bands up fails,
-     * while the design as shipped has no slack it did not earn. For scale, ~0.02 is roughly
-     * where two colours stop being tellable apart side by side, and the same 138-degree arc
-     * walked at one fixed lightness measures 0.018 between neighbours -- which is the whole
-     * reason the lightness alternates.
+     * <p>This bar is the whole point of the class. Two separate releases shipped a table whose
+     * adjacent brackets were all comfortably apart and whose distant ones were not, because
+     * the only separation this file ever measured was between neighbours. 1.0.3's level-590
+     * pale cyan sat 0.0869 from the level-200 aqua -- nineteen rows away, so nothing looked at
+     * it -- and a player reported them as the same colour.
+     *
+     * <p>0.1142 is what the search actually reached with six bands above 480 under the
+     * progression and contrast constraints; the bar sits a hair under it, so a hue, lightness
+     * or chroma edit that meaningfully closes the table up fails while the design as shipped
+     * has no slack it did not earn. For scale, ~0.02 is roughly where two colours stop being
+     * tellable apart side by side and ~0.10 is where they stop reading as different colours at
+     * a glance in a chat line.
      */
-    private static final double MIN_BAND_STEP = 0.11;
+    private static final double MIN_TABLE_SEPARATION = 0.113;
 
     /**
-     * The floor adjacent vanilla-half brackets hold.
+     * The floor the vanilla-only pairs hold, which is lower and not SkyPrism's to raise.
      *
-     * <p>Lower than {@link #MIN_BAND_STEP} because this half is not SkyPrism's to tune: the
-     * tightest pair is levels 100 and 120 at 0.084, both sampled straight off Hypixel's own
-     * green run. The bar exists to catch a bracket that got dropped or duplicated, not to
-     * grade colours the mod deliberately inherited.
+     * <p>The 24 brackets below 480 are Hypixel's tier hexes and the midpoints between them,
+     * reproduced on purpose. Their tightest pair anywhere is levels 80 and 100 at 0.0844, both
+     * sitting on the server's own yellow-to-green run. This bar exists to catch a bracket that
+     * got dropped, duplicated or mistyped, not to grade colours the mod deliberately inherited.
      */
-    private static final double MIN_VANILLA_STEP = 0.08;
+    private static final double MIN_VANILLA_SEPARATION = 0.084;
 
     /** Highest level any shipped ramp is designed for; above it {@link GradientRamp} clamps. */
     private static final int TOP_LEVEL = 600;
+
+    /** Levels per bracket, both halves of the shipped table. */
+    private static final int BAND_WIDTH = 20;
+
+    /** The last boundary in the shipped table; {@link BracketTable} clamps above it. */
+    private static final int TOP_BAND_LEVEL = 580;
 
     @Test
     @DisplayName("vanillaBrackets is exactly the 13 Hypixel tiers, 40 levels apart")
@@ -138,33 +151,32 @@ class PalettePresetsTest {
     // ------------------------------------------------- the shipped default table
 
     @Test
-    @DisplayName("defaultBrackets is 37 entries: 24 vanilla every 20, then 13 SkyPrism every 10")
+    @DisplayName("defaultBrackets is 30 entries on one 20-level cadence: 24 vanilla, then 6 SkyPrism")
     void defaultTableHasTheShippedShape() {
         var table = PalettePresets.defaultBrackets();
         var brackets = table.brackets();
-        assertEquals(37, brackets.size(), "24 below 480 plus 13 from 480 to 600");
+        assertEquals(30, brackets.size(), "24 below 480 plus 6 from 480 to 580");
         assertTrue(brackets.size() <= SkyPrismConfig.LevelSettings.MAX_TABLE_ENTRIES,
             "the shipped table must fit inside the cap the config parser enforces, so a user "
                 + "who opens the table editor on it can still add rows");
 
         assertEquals(0, brackets.get(0).minLevel());
-        assertEquals(TOP_LEVEL, brackets.get(brackets.size() - 1).minLevel(),
-            "the table terminates at 600, which is also the shimmer's first level -- one number, "
-                + "not two free to drift apart");
+        assertEquals(TOP_BAND_LEVEL, brackets.get(brackets.size() - 1).minLevel(),
+            "the table terminates at 580; a seventh band at 600 would have to be placed in the "
+                + "cyan corner the level-590 bug lived in");
 
-        for (BracketTable.Bracket b : brackets) {
-            if (b.minLevel() < TOP_TIER_LEVEL) {
-                assertEquals(0, b.minLevel() % 20, "vanilla-half bracket " + b.minLevel());
-            } else {
-                assertEquals(0, b.minLevel() % 10, "SkyPrism band " + b.minLevel());
-            }
+        // One cadence, the whole way up. The 480+ half used to step every 10, which is the
+        // resolution that made the collisions unavoidable -- there is not enough unclaimed
+        // hue left, once Hypixel's 13 tiers are on the table, to place 13 bands legibly.
+        for (int i = 0; i < brackets.size(); i++) {
+            assertEquals(i * BAND_WIDTH, brackets.get(i).minLevel(), "bracket " + i + " boundary");
         }
-        // No gaps and no repeats in either half.
-        for (int i = 1; i < brackets.size(); i++) {
-            int expected = brackets.get(i - 1).minLevel()
-                + (brackets.get(i).minLevel() > TOP_TIER_LEVEL ? 10 : 20);
-            assertEquals(expected, brackets.get(i).minLevel(), "bracket " + i + " boundary");
-        }
+
+        // 600 is the default chromaMinLevel and it is above the last boundary, so the shimmer
+        // starts on top of a clamped band rather than on a band of its own.
+        assertEquals(brackets.get(brackets.size() - 1).rgb(), table.colorAt(TOP_LEVEL),
+            "600 must clamp onto the top band");
+        assertEquals(table.colorAt(TOP_LEVEL), table.colorAt(9000), "and so must everything above");
     }
 
     @Test
@@ -214,58 +226,111 @@ class PalettePresetsTest {
     }
 
     @Test
-    @DisplayName("no two neighbouring brackets in the default table blur together")
-    void defaultTableNeighboursStayApart() {
+    @DisplayName("NO two brackets anywhere in the default table blur together -- far pairs included")
+    void noTwoBracketsAnywhereInTheTableBlurTogether() {
+        // This is the assertion the class was missing for two releases. Level 590 and level 200
+        // are nineteen rows apart, so every neighbour-only check ever written here passed on
+        // them while a player was looking at two identical-looking numbers in chat. A tag does
+        // not know which bracket it is next to; it is compared against every other tag on the
+        // screen, so the invariant has to be over every pair in the table.
         var brackets = PalettePresets.defaultBrackets().brackets();
-        for (int i = 1; i < brackets.size(); i++) {
-            BracketTable.Bracket lo = brackets.get(i - 1);
-            BracketTable.Bracket hi = brackets.get(i);
-            double d = oklabDistance(lo.rgb(), hi.rgb());
-            double bar = hi.minLevel() > TOP_TIER_LEVEL ? MIN_BAND_STEP : MIN_VANILLA_STEP;
-            assertTrue(d >= bar, () -> String.format(
-                "brackets %d (#%06X) and %d (#%06X) are only %.4f apart; bar is %.2f",
-                lo.minLevel(), lo.rgb(), hi.minLevel(), hi.rgb(), d, bar));
-        }
-        // And no colour appears twice anywhere in the table, near or far.
         for (int i = 0; i < brackets.size(); i++) {
             for (int j = i + 1; j < brackets.size(); j++) {
-                assertTrue(brackets.get(i).rgb() != brackets.get(j).rgb(),
-                    "brackets " + brackets.get(i).minLevel() + " and "
-                        + brackets.get(j).minLevel() + " are the same colour");
+                BracketTable.Bracket lo = brackets.get(i);
+                BracketTable.Bracket hi = brackets.get(j);
+                boolean bothInherited =
+                    lo.minLevel() < TOP_TIER_LEVEL && hi.minLevel() < TOP_TIER_LEVEL;
+                double bar = bothInherited ? MIN_VANILLA_SEPARATION : MIN_TABLE_SEPARATION;
+                double d = oklabDistance(lo.rgb(), hi.rgb());
+                assertTrue(d >= bar, () -> String.format(
+                    "brackets %d (#%06X) and %d (#%06X) are only %.4f apart; bar is %.4f%s",
+                    lo.minLevel(), lo.rgb(), hi.minLevel(), hi.rgb(), d, bar,
+                    bothInherited ? " (both inherited from Hypixel)" : ""));
             }
         }
     }
 
     @Test
-    @DisplayName("above 480 the alternating lightness, not the hue step, is what separates bands")
-    void theBandsAlternateLightnessBecauseTheHueStepAloneIsTooSmall() {
+    @DisplayName("the whole-table bar is exactly what the 1.0.3 colours would have failed")
+    void theSeparationBarWouldHaveCaughtTheColoursThatShipped() {
+        // A bar nothing can fail is not a bar. These are the literal hexes 1.0.3 drew, checked
+        // against the floor the current table holds, so the test above is demonstrably tight
+        // enough to have stopped the release that caused this.
+        //
+        // Level 590 pale cyan against the level-200 aqua: what the player actually reported.
+        double reported = oklabDistance(0x96E1FD, 0x55FFFF);
+        assertTrue(reported < MIN_TABLE_SEPARATION, () -> String.format(
+            "the 1.0.3 level-590 (#96E1FD) sat %.4f from the level-200 aqua and the bar is now "
+                + "%.4f; if that no longer fails, the bar has been loosened past the bug", reported,
+            MIN_TABLE_SEPARATION));
+
+        // And the closest pair 1.0.3 shipped at all -- levels 550 and 570, two apart, sharing a
+        // lightness, separated by nothing but 23 degrees of hue.
+        double tightest = oklabDistance(0xC4D3FD, 0xB2D9FD);
+        assertTrue(tightest < reported, "premise check: 550/570 was the tightest pair of the two");
+        assertTrue(tightest < MIN_TABLE_SEPARATION,
+            () -> "the 1.0.3 550/570 pair measured " + tightest);
+
+        // Neither retired colour survives into the shipped table under any level.
+        for (BracketTable.Bracket b : PalettePresets.defaultBrackets().brackets()) {
+            assertTrue(b.rgb() != 0x96E1FD && b.rgb() != 0xC4D3FD,
+                "a retired 1.0.3 band colour is still in the table at " + b.minLevel());
+        }
+    }
+
+    @Test
+    @DisplayName("above 480 the bands sweep one way in hue and alternate lightness across it")
+    void theBandsAreAProgressionAndNotAScatter() {
         var brackets = PalettePresets.defaultBrackets().brackets();
         var bands = brackets.subList(24, brackets.size());
-        assertEquals(13, bands.size());
+        assertEquals(6, bands.size());
 
-        double worstLightnessSwing = Double.MAX_VALUE;
+        // A plain max-min search over legible colours reaches a slightly higher floor than this
+        // table does, and produces an olive next to an azure next to a pink: mutually distinct
+        // and no progression at all. These two assertions are the constraint that rules that
+        // out -- hue advances in one direction in roughly even steps, and lightness alternates.
+        double smallest = Double.MAX_VALUE;
+        double largest = 0;
         for (int i = 1; i < bands.size(); i++) {
-            double a = Oklab.srgbToOklab(bands.get(i - 1).rgb())[0];
-            double b = Oklab.srgbToOklab(bands.get(i).rgb())[0];
-            worstLightnessSwing = Math.min(worstLightnessSwing, Math.abs(a - b));
+            final double step = descendingHueStep(bands.get(i - 1).rgb(), bands.get(i).rgb());
+            assertTrue(step > 10 && step < 60, () -> String.format(
+                "hue step %.1f degrees: the sweep reversed, wrapped, or lurched", step));
+            smallest = Math.min(smallest, step);
+            largest = Math.max(largest, step);
         }
-        // 0.109 measured. Ten levels of hue is 11.5 degrees, which on its own moves a colour
-        // about 0.018 -- under the ~0.02 where two colours stop being tellable apart. Nearly
-        // all of the 0.119 neighbours actually differ by is this swing, so if the alternation
-        // ever flattens out the bands collapse into each other whatever the hues say.
-        final double swing = worstLightnessSwing;
-        assertTrue(swing >= 0.09,
-            () -> "the lightness alternation has flattened to " + swing);
+        final double lo = smallest;
+        final double hi = largest;
+        assertTrue(hi / lo <= 2.0, () -> String.format(
+            "the hue steps range from %.1f to %.1f degrees; that unevenness reads as a scatter",
+            lo, hi));
 
-        // Same-lightness bands two apart are 23 degrees of hue and nothing else, and they are
-        // the closest pairs in the table -- which is the evidence for the paragraph above.
-        double worstSameParity = Double.MAX_VALUE;
-        for (int i = 0; i + 2 < bands.size(); i++) {
-            worstSameParity = Math.min(worstSameParity,
-                oklabDistance(bands.get(i).rgb(), bands.get(i + 2).rgb()));
+        // Lightness alternates strictly: pale, saturated, pale, saturated. This is Hypixel's
+        // own grammar inverted, and it is load-bearing, not decorative -- see below.
+        for (int i = 2; i < bands.size(); i++) {
+            double a = Oklab.srgbToOklab(bands.get(i - 2).rgb())[0];
+            double b = Oklab.srgbToOklab(bands.get(i - 1).rgb())[0];
+            double c = Oklab.srgbToOklab(bands.get(i).rgb())[0];
+            assertTrue(Math.signum(b - a) == -Math.signum(c - b),
+                "the lightness alternation flattened at band " + i);
         }
-        assertTrue(worstSameParity < swing,
-            "two bands apart at equal lightness ought to be closer than one band apart across it");
+
+        // The counterfactual, measured rather than asserted: rebuild the identical hue and
+        // chroma sweep at one flat lightness and the neighbours collapse to 0.042, a third of
+        // the floor the table holds. Every band on this half owes most of its separation to the
+        // swing, so flattening it would reopen the bug whatever the hues said.
+        double flatL = 0;
+        for (BracketTable.Bracket b : bands) {
+            flatL += Oklab.srgbToOklab(b.rgb())[0] / bands.size();
+        }
+        double worstFlat = Double.MAX_VALUE;
+        for (int i = 1; i < bands.size(); i++) {
+            worstFlat = Math.min(worstFlat,
+                oklabDistance(atLightness(bands.get(i - 1).rgb(), flatL),
+                    atLightness(bands.get(i).rgb(), flatL)));
+        }
+        final double flat = worstFlat;
+        assertTrue(flat < MIN_TABLE_SEPARATION / 2, () -> String.format(
+            "flattened to one lightness the same arc measures %.4f between neighbours", flat));
     }
 
     // ------------------------------------------------------------- the default
@@ -501,6 +566,27 @@ class PalettePresetsTest {
     }
 
     // ----------------------------------------------------------------- helpers
+
+    /**
+     * How far the hue wheel turns going from {@code a} to {@code b} in the sweep's direction.
+     *
+     * <p>Returned in degrees on 0..360 so a wrap past zero -- the 480 salmon sits at 23 degrees
+     * and the 500 rose at 346 -- reads as a 37-degree step rather than a 323-degree jump.
+     */
+    private static double descendingHueStep(int a, int b) {
+        double[] p = Oklab.srgbToOklab(a);
+        double[] q = Oklab.srgbToOklab(b);
+        double ha = Math.toDegrees(Math.atan2(p[2], p[1]));
+        double hb = Math.toDegrees(Math.atan2(q[2], q[1]));
+        double step = (ha - hb) % 360.0;
+        return step < 0 ? step + 360.0 : step;
+    }
+
+    /** The same hue and chroma at a different perceptual lightness. */
+    private static int atLightness(int rgb, double lightness) {
+        double[] lab = Oklab.srgbToOklab(rgb);
+        return Oklab.oklabToSrgb(lightness, lab[1], lab[2]);
+    }
 
     /** Perceptual distance between two packed colours, in Oklab units. */
     private static double oklabDistance(int a, int b) {

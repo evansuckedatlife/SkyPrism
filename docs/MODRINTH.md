@@ -65,8 +65,8 @@ version.
 
 | File | Modrinth version number | Game version | Loader |
 |---|---|---|---|
-| `skyprism-1.0.3+26.1.2.jar` | `1.0.2+26.1.2` | 26.1.2 | Fabric |
-| `skyprism-1.0.3+26.2.jar` | `1.0.2+26.2` | 26.2 | Fabric |
+| `skyprism-1.0.4+26.1.2.jar` | `1.0.2+26.1.2` | 26.1.2 | Fabric |
+| `skyprism-1.0.4+26.2.jar` | `1.0.2+26.2` | 26.2 | Fabric |
 
 Both come out of `./gradlew buildAllVersions`, into `build/libs/<version>/`. Release channel:
 **Release**. Changelog for each: the matching section of
@@ -157,7 +157,7 @@ configurable.
 
 1. Minecraft **26.1.2** (or **26.2**) with **Fabric Loader 0.19.3+** and **Java 25**
 2. [Fabric API](https://modrinth.com/mod/fabric-api)
-3. The jar for **your** Minecraft version — `skyprism-1.0.3+26.1.2.jar` or `skyprism-1.0.3+26.2.jar`
+3. The jar for **your** Minecraft version — `skyprism-1.0.4+26.1.2.jar` or `skyprism-1.0.4+26.2.jar`
    — into your `mods/` folder. **They are not interchangeable.**
 4. *Optional but recommended:* [YACL](https://modrinth.com/mod/yacl) and
    [Mod Menu](https://modrinth.com/mod/modmenu) for the settings screen

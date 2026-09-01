@@ -52,7 +52,22 @@
     "",
     "Drop tables read from https://hypixelskyblock.minecraft.wiki -- the Mythological Ritual",
     "and Griffin Burrow pages on 2026-08-29, and the slayer, Catacombs, Kuudra, Crystal",
-    "Hollows, Glacite, fishing, foraging, Garden, Hoppity and Rift pages on 2026-08-30.",
+    "Hollows, Glacite, fishing, foraging, Garden, Hoppity and Rift pages on 2026-08-30; the",
+    "Mythological Ritual, Minos Inquisitor, Reindrake, Crystal Nucleus, Frozen Corpse,",
+    "Headless Horseman and Vanquisher pages again on 2026-09-01, when the per-source pools",
+    "were filled out to the whole table rather than only the drops worth a flourish.",
+    "",
+    "ONE SOURCE, ONE PICTURE, AND THE TRAP THAT HID IN IT. The no-repeat rule is checked per",
+    "source, and until the pools were widened several rows were sharing an item safely only",
+    "because no single source listed two of them. Widening broke five of those at once, and",
+    "each is worth knowing about because the same shape will come back: the six Diana",
+    "attribute shards were ONE row (so six different drops drew one picture the moment the",
+    "ritual listed all six), the Endersnake Rune was extra spellings on the Snake Rune's row",
+    "(Voidgloom and Revenant, and SLAYER_BOSS pays both), and Paragon Shard / Inferno",
+    "Demonlord Shard, Scorched Power Crystal / Etherwarp Merger and Wolf Tooth / Severed Hand",
+    "were each argued as safe on the grounds that they belong to different BOSSES -- true, and",
+    "irrelevant, because SLAYER_BOSS is one source paying all six slayers. Two rows are only",
+    "safe on one item if no source can pay both, and 'different fight' is not the same claim.",
     "",
     "WHERE THE NAMES ARE CHECKED. Every name in this file is now pinned by",
     "SkyBlockNameSnapshotTest against skyblock_item_names.tsv, a snapshot generated from the",
@@ -231,9 +246,34 @@
       "why": "Wiki shows Enchanted_Yellow_Wool.png -- the golden fleece, shimmering, hence the glint."
     },
     {
-      "names": ["Minos Hunter Shard", "Cretan Bull Shard", "Harpy Shard", "Minotaur Shard", "Sphinx Shard", "King Minos Shard"],
+      "names": ["Minos Hunter Shard"],
       "item": "minecraft:prismarine_shard",
-      "why": "The six Mythological attribute shards, all on the prismarine shard because they are one family and no source pays two of them in the reel-checked lists. Six invented shard names were removed from this row; these six are the only Diana shards that exist."
+      "why": "The Mythological Ruler shard. All six Diana attribute shards used to share this one row, which was safe only while no source listed two of them; the Mythological Ritual pays all six, so they are six rows now and the reel can no longer show one picture six times in a turn of the drum. The pale pointed shard is the family's plain member; the other five take the spawn egg of the creature that carries them, which is how this table already draws a shard that names a mob."
+    },
+    {
+      "names": ["Cretan Bull Shard"],
+      "item": "minecraft:cow_spawn_egg",
+      "why": "Mythological Resistance, off the Cretan Bull. The cow egg is vanilla's bull."
+    },
+    {
+      "names": ["Harpy Shard"],
+      "item": "minecraft:chicken_spawn_egg",
+      "why": "Tree Lurker, off the Harpy. A harpy is a bird-woman and the chicken egg is vanilla's bird."
+    },
+    {
+      "names": ["Minotaur Shard"],
+      "item": "minecraft:goat_spawn_egg",
+      "why": "Mythological Fortune, off the Minotaur. The goat is vanilla's horned charger, and the cow egg is already the Cretan Bull's."
+    },
+    {
+      "names": ["Sphinx Shard"],
+      "item": "minecraft:ocelot_spawn_egg",
+      "why": "Mythological Tracker, off the Sphinx, which is lion-bodied. The ocelot egg is the Tiger pet's too, but that is a PET_DROP and this is Diana, so no one strip carries both."
+    },
+    {
+      "names": ["King Minos Shard"],
+      "item": "minecraft:villager_spawn_egg",
+      "why": "King of Greed, off King Minos, who is the one mythological creature that is a man rather than a beast. The glinted golden helmet beside it on the Diana strip is his Crown of Greed."
     },
     {
       "names": ["Ancestral Spade", "Archaic Spade", "Deific Spade"],
@@ -392,9 +432,14 @@
       "why": "Runes are engraved tablets. Vanilla's pottery sherds are engraved tablets and come in twenty distinct engravings, which is what lets the rune family share one silhouette and still be different pictures. The prize sherd's motif is the closest to an enchanting sigil."
     },
     {
-      "names": ["Snake Rune", "Snake Rune I", "Endersnake Rune", "Endersnake Rune I"],
+      "names": ["Snake Rune", "Snake Rune I"],
       "item": "minecraft:danger_pottery_sherd",
-      "why": "Same tablet family; the danger sherd's fanged motif is the one that reads as a snake."
+      "why": "Same tablet family; the danger sherd's fanged motif is the one that reads as a snake. The Endersnake Rune used to be two more spellings on this row, which was a second drop hiding behind the first: the Revenant pays the Snake Rune, the Voidgloom pays the Endersnake Rune, and SLAYER_BOSS pays both, so a shared row would have put one picture twice in a single turn of that drum."
+    },
+    {
+      "names": ["Endersnake Rune", "Endersnake Rune I"],
+      "item": "minecraft:snort_pottery_sherd",
+      "why": "Same engraved-tablet family, split off the Snake Rune so the two can sit on one strip; the snort sherd's snouted motif is the nearest thing to a second serpent."
     },
     {
       "names": ["Fiery Burst Rune", "Fiery Burst Rune I"],
@@ -1692,8 +1737,8 @@
     },
     {
       "names": ["Paragon Shard"],
-      "item": "minecraft:amethyst_shard",
-      "why": "A hunting shard, and the only shard in the Broodfather table, so it takes the plain violet one."
+      "item": "minecraft:spider_spawn_egg",
+      "why": "The Broodfather's shard. It was the plain violet amethyst shard, which is also the Inferno Demonlord Shard's, and that was invisible while the two tables were only ever checked one at a time -- SLAYER_BOSS pays both, so the strip would have shown one picture twice. The spider egg is the move this table already makes for a shard that names a mob (Chameleon, Dreadwing, Grizzly Bear), and it names the right one."
     },
     {
       "names": ["Spirit Rune", "Spirit Rune I"],
@@ -1772,8 +1817,8 @@
     },
     {
       "names": ["Scorched Power Crystal"],
-      "item": "minecraft:end_crystal",
-      "why": "A crystal that holds power. The end crystal is vanilla's power-holding crystal, and the Etherwarp Merger that shares it is a Voidgloom drop, never an Inferno one."
+      "item": "minecraft:fire_charge",
+      "why": "A scorched thing that holds power. It was the end crystal, on the argument that the Etherwarp Merger sharing it is a Voidgloom drop and never an Inferno one -- true of the two wiki tables, false of the machine, because SLAYER_BOSS is one source paying all six slayers and would have shown the same crystal twice. The fire charge is vanilla's held ball of fire, which is what the name asks for, and the end crystal cannot be told apart by glint because it carries one already."
     },
     {
       "names": ["Kuudra Key"],
@@ -2144,8 +2189,73 @@
     },
     {
       "names": ["Wolf Tooth"],
-      "item": "minecraft:bone",
-      "why": "A tooth, so the bone -- and it is free on the Sven Packmaster table, where the other bone rows (Severed Hand, Skeleton Fish) do not appear. It went in when the published Sven table was corrected: the wiki lists Wolf Tooth, and lists no catalyst at all."
+      "item": "minecraft:pointed_dripstone",
+      "why": "A tooth. It was the bone, which was free on the Sven table alone but not on SLAYER_BOSS, where the Revenant's Severed Hand already holds the bone. Dripstone is the fang shape this table already uses for Arachne's Fang and the Fateful Stinger, and neither of those is slayer loot."
+    },
+    {
+      "names": ["Sangria Dye"],
+      "item": "minecraft:brown_dye",
+      "why": "The Riftstalker Bloodfiend's dye. Sangria is wine, and the slayer strip already spends purple on Byzantium and red on Brick Red, so this takes the deep brown-red; the Carmine Dye that shares it is a sea creature drop."
+    },
+    {
+      "names": ["Unfanged Vampire Part", "Unfanged Vampire Parts"],
+      "item": "minecraft:beef",
+      "why": "A part off a vampire. Raw beef is vanilla's raw piece of somebody; the plain porkchop and the cooked one are already the Revenant Viscera's and the Gabagool Distillate's."
+    },
+    {
+      "names": ["McGrubber's Burger"],
+      "item": "minecraft:cooked_beef",
+      "why": "It is a burger, and the cooked beef is vanilla's patty."
+    },
+    {
+      "names": ["Bubba Blister"],
+      "item": "minecraft:slime_ball",
+      "why": "A blister is a fluid-filled sac, which is what the slime ball draws at 16x16. Ectoplasm and Vinesap share it and neither is slayer loot."
+    },
+    {
+      "names": ["Fang-tastic Chocolate Chip"],
+      "item": "minecraft:cocoa_beans",
+      "why": "A chocolate chip, and cocoa beans are vanilla's chocolate. The Carnival's Coconut shares them and is not a slayer drop."
+    },
+    {
+      "names": ["Guardian Lucky Block"],
+      "item": "minecraft:sponge",
+      "why": "Custom texture. Sponge is vanilla's guardian trophy and is a block, which is the two halves of the name; nothing else in this table uses it."
+    },
+    {
+      "names": ["Soultwist Rune", "Soultwist Rune I"],
+      "item": "minecraft:heartbreak_pottery_sherd",
+      "why": "Same engraved-tablet family as the other runes; the heartbreak sherd is the one whose motif reads as something twisted out of a person."
+    },
+    {
+      "names": ["Spooky Fragment", "Spooky Fragments"],
+      "item": "minecraft:amethyst_shard",
+      "why": "The Headless Horseman's guaranteed payout. Custom texture, and the shard is what this table already uses for anything called a fragment; the three other rows on it are Diana, dragon and slayer loot, none of which is Spooky Festival loot."
+    },
+    {
+      "names": ["Midnight Dye"],
+      "item": "minecraft:blue_dye",
+      "why": "The Horseman's RNGesus drop. Midnight is deep blue, and the Iceberg Dye that shares the item is a Reindrake drop."
+    },
+    {
+      "names": ["Nether Star"],
+      "item": "minecraft:nether_star",
+      "why": "The Vanquisher's guaranteed drop, and it is literally the vanilla nether star. The three rows already on that item -- Null Atom, First Master Star, North Star -- belong to the slayer, dungeon and Rift tables, so no strip carries two of them."
+    },
+    {
+      "names": ["Jade Dye"],
+      "item": "minecraft:green_dye",
+      "why": "The Crystal Nucleus run's rarest payout, at two parts in a million. Jade is green and the glinted emerald beside it on that strip is the Flawless Jade Gemstone, so the dye takes the plain green dye; the Green Candy that shares it is a Primal Fear drop."
+    },
+    {
+      "names": ["Frostbitten Dye"],
+      "item": "minecraft:light_blue_dye",
+      "why": "The frozen corpses' RNGesus drop. Pale ice blue, and the Celeste Dye that shares the row's item is slayer loot, so no one strip carries both."
+    },
+    {
+      "names": ["Coven Seal", "Coven Seals"],
+      "item": "minecraft:paper",
+      "why": "A seal is a stamped document, and paper is vanilla's document. The Travel Scroll and the Suspicious Scrap share it; neither is slayer loot."
     }
   ]
 }

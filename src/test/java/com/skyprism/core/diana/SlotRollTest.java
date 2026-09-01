@@ -22,10 +22,16 @@ import org.junit.jupiter.api.Test;
  * Bare-JVM tests for {@link SlotRoll}, driven entirely by {@link FixedClock}.
  *
  * <p>The test config uses round numbers so every boundary can be asserted on the exact
- * millisecond rather than within a tolerance. Act one: spin 1000, stagger 200, so with three reels
- * the locks fall at 1000 / 1200 / 1400, the settle ends at 1900 and, with no jackpot, the fade ends
- * at 2000. Act two, when it is earned, picks up at 1900: 400 of gold wash, 600 of re-spin, then
- * landings 100 apart at 2900 / 3000 / 3100, an 800 hold to 3900 and the same 100 fade to 4000.
+ * millisecond rather than within a tolerance. An ordinary roll: spin 1000, stagger 200, so with
+ * three reels the locks fall at 1000 / 1200 / 1400, the settle ends at 1900 and the fade ends at
+ * 2000.
+ *
+ * <p>A roll that captured a rare drop during the spin branches off at 1000 -- the instant reel 0
+ * would have locked -- and never reaches 1200, 1400 or the settle at all: 400 of gold wash over
+ * reels that never stopped, 600 more of spin, then landings 100 apart at 2000 / 2100 / 2200, an
+ * 800 hold to 3000 and the same 100 fade to 3100. That branch point is why every {@code J_}
+ * constant below is written as {@link #J_INTRO_START} plus an offset: a banner Hypixel printed
+ * late moves the whole act, and the tests for that path add the same offsets to a different origin.
  */
 class SlotRollTest {
 
@@ -42,14 +48,25 @@ class SlotRollTest {
     private static final long SETTLE_END = 1900L;
     private static final long FADE_END = 2000L;
 
-    /** Act two, all measured from {@link #SETTLE_END}, which is where it begins. */
-    private static final long J_INTRO_START = SETTLE_END;          // 1900
-    private static final long J_SPIN_START = 2300L;
-    private static final long J_LOCK_0 = 2900L;
-    private static final long J_LOCK_1 = 3000L;
-    private static final long J_LOCK_2 = 3100L;
-    private static final long J_HOLD_END = 3900L;
-    private static final long J_FADE_END = 4000L;
+    /** Offsets into act two from wherever it opens, so the late-banner tests can rebase them. */
+    private static final long J_SPIN_OFFSET = 400L;                // + intro
+    private static final long J_LOCK_0_OFFSET = 1000L;             // + intro + spin
+    private static final long J_LOCK_1_OFFSET = 1100L;
+    private static final long J_LOCK_2_OFFSET = 1200L;
+    private static final long J_HOLD_END_OFFSET = 2000L;           // + hold
+    private static final long J_FADE_END_OFFSET = 2100L;           // + fade
+
+    /**
+     * Act two for the ordinary lucky roll, whose banner arrived during the spin: it opens at the
+     * first reel's lock instant, so the reels never stop at all.
+     */
+    private static final long J_INTRO_START = LOCK_0;              // 1000
+    private static final long J_SPIN_START = J_INTRO_START + J_SPIN_OFFSET;        // 1400
+    private static final long J_LOCK_0 = J_INTRO_START + J_LOCK_0_OFFSET;          // 2000
+    private static final long J_LOCK_1 = J_INTRO_START + J_LOCK_1_OFFSET;          // 2100
+    private static final long J_LOCK_2 = J_INTRO_START + J_LOCK_2_OFFSET;          // 2200
+    private static final long J_HOLD_END = J_INTRO_START + J_HOLD_END_OFFSET;      // 3000
+    private static final long J_FADE_END = J_INTRO_START + J_FADE_END_OFFSET;      // 3100
 
     private static LootDrop drop(String name) {
         return new LootDrop(name, "a", 1, false);
@@ -179,7 +196,10 @@ class SlotRollTest {
             var clock = new FixedClock();
             var roll = new SlotRoll(CFG, clock);
             roll.start(MythologicalCreature.MINOS_INQUISITOR);
-            roll.offerDrop(rare("Crown of Greed"));
+            // An ordinary drop, so the roll is genuinely mid-LOCKING here: a rare one would have
+            // branched into the celebration at the first lock instant and this half of the test
+            // would be resetting from act two twice.
+            roll.offerDrop(drop("Crown of Greed"));
             clock.set(LOCK_1);
             assertEquals(RollState.LOCKING, roll.state());
 
@@ -265,8 +285,16 @@ class SlotRollTest {
             }
         }
 
+        /**
+         * All five drops are ordinary, and that is not an accident: a rare one cannot be observed
+         * on a landed column any more, because a rare captured during the spin takes the machine
+         * into act two at the first lock instant and every column then chases the prize instead.
+         * The rare-first half of the ranking is pinned where it is now observable, on
+         * {@link SlotRoll#jackpotSymbol()} -- see {@code WhichJackpotWins} and
+         * {@link #rarityTakesTheMachineToActTwo()}.
+         */
         @Test
-        @DisplayName("more drops than reels: the rarest win the columns, the rest stay in capturedDrops")
+        @DisplayName("more drops than reels: the best win the columns, the rest stay in capturedDrops")
         void moreDropsThanReels() {
             var clock = new FixedClock();
             var roll = new SlotRoll(CFG, clock);
@@ -274,35 +302,45 @@ class SlotRollTest {
             var common1 = drop("Ancient Claw");
             var common2 = drop("Griffin Feather");
             var big = drop("Mythological Bone Fragment", 9);
-            var jackpot = rare("Chimera");
+            var middling = drop("Chimera", 4);
             var common3 = drop("Dwarf Turtle Shelmet");
             roll.offerDrop(common1);
             roll.offerDrop(common2);
             roll.offerDrop(big);
-            roll.offerDrop(jackpot);
+            roll.offerDrop(middling);
             roll.offerDrop(common3);
 
             clock.set(LOCK_2);
-            assertEquals(List.of(jackpot, big, common1), symbols(roll),
-                    "rare first, then the biggest stack, then arrival order");
-            assertEquals(List.of(common1, common2, big, jackpot, common3), roll.capturedDrops(),
+            assertEquals(List.of(big, middling, common1), symbols(roll),
+                    "biggest stack first, then the next, then arrival order among the singles");
+            assertEquals(List.of(common1, common2, big, middling, common3), roll.capturedDrops(),
                     "capturedDrops keeps everything, in arrival order");
         }
 
+        /**
+         * The old form of this asserted that a rare drop took the leftmost <em>column</em>. It
+         * cannot: the banner now opens the celebration at the first lock instant, so the rare is
+         * never a landed act-one symbol -- it is the thing all three columns converge on instead,
+         * which is a stronger version of the same claim and the one worth pinning.
+         */
         @Test
-        @DisplayName("a rare drop outranks an earlier common one however late it arrives")
-        void rarityOutranksArrival() {
+        @DisplayName("a rare drop takes the machine to act two rather than to a single column")
+        void rarityTakesTheMachineToActTwo() {
             var clock = new FixedClock();
             var roll = new SlotRoll(CFG, clock);
             roll.start(MythologicalCreature.SPHINX);
-            var common = drop("Ancient Claw");
+            var common = drop("Ancient Claw", 64);
             roll.offerDrop(common);
             clock.set(500L);
             var jackpot = rare("Crown of Greed");
             roll.offerDrop(jackpot);
 
             clock.set(LOCK_2);
-            assertEquals(jackpot, symbols(roll).get(0));
+            assertEquals(jackpot, roll.jackpotSymbol(),
+                    "the banner outranks a 64-stack whatever order they arrived in");
+            assertEquals(List.of(jackpot, jackpot, jackpot), symbols(roll));
+            assertTrue(roll.capturedDrops().contains(common),
+                    "and the ordinary drop is still there for the caption");
         }
 
         @Test
@@ -371,18 +409,25 @@ class SlotRollTest {
     // ------------------------------------------------------------------ act one is untouched
 
     /**
-     * The behaviour the whole rework exists to produce: a kill that dropped something rare must be
-     * indistinguishable from one that did not, right up until the ordinary result has been read.
-     * Everything here would have failed against the previous design, where a jackpot bought extra
-     * spin time and raised a flag the HUD painted gold from the first frame.
+     * A kill that dropped something rare must be indistinguishable from one that did not for the
+     * whole of the ordinary spin -- a roll that announced its jackpot from the first frame has
+     * spent the surprise before the reels have said anything.
+     *
+     * <p><b>What changed, and why.</b> That used to hold right up to the end of the settle, which
+     * meant a lucky roll locked its columns, held them dead still for 2.5 seconds and only then
+     * broke them loose for the celebration: a stop and a restart in the middle of the build. It
+     * now holds up to the first reel's lock instant, which is where the two paths part company --
+     * the ordinary roll begins landing there and the lucky one keeps spinning into the gold. The
+     * invariant the rework kept is the one about <em>concealment</em>, not the one about the
+     * locks: nothing before {@link #LOCK_0} may betray the banner.
      */
     @Nested
-    @DisplayName("a jackpot is invisible until act one has finished")
-    class ActOneIsUntouched {
+    @DisplayName("a jackpot is invisible until the reels would have started landing")
+    class TheSpinIsUntouched {
 
         @Test
-        @DisplayName("the act-one boundaries are identical with and without a jackpot")
-        void actOneTimingIsIdentical() {
+        @DisplayName("the spin is identical with and without a jackpot, up to the first lock")
+        void spinTimingIsIdentical() {
             var plainClock = new FixedClock();
             var plain = new SlotRoll(CFG, plainClock);
             plain.start(MythologicalCreature.MINOS_INQUISITOR);
@@ -393,36 +438,61 @@ class SlotRollTest {
             lucky.start(MythologicalCreature.MINOS_INQUISITOR);
             lucky.offerDrop(rare("Chimera"));
 
-            for (long t = 0; t < SETTLE_END; t++) {
+            for (long t = 0; t < LOCK_0; t++) {
                 plainClock.set(t);
                 luckyClock.set(t);
-                assertEquals(plain.state(), lucky.state(), "act one diverged at t=" + t);
+                assertEquals(plain.state(), lucky.state(), "the spin diverged at t=" + t);
                 assertEquals(locks(plain), locks(lucky), "a reel locked at a different time at t=" + t);
                 assertFalse(lucky.inJackpotSequence(), "act two must not have started at t=" + t);
-                assertEquals(0.0d, lucky.jackpotIntroProgress(), "no gold in act one, at t=" + t);
+                assertEquals(0.0d, lucky.jackpotIntroProgress(), "no gold during the spin, at t=" + t);
             }
         }
 
         @Test
-        @DisplayName("the reels show the real drops through act one, not the jackpot symbol")
-        void actOneShowsTheRealDrops() {
+        @DisplayName("a lucky roll's reels never come to rest before the three of a kind")
+        void theReelsNeverStopBeforeTheCelebration() {
             var clock = new FixedClock();
             var roll = new SlotRoll(CFG, clock);
             roll.start(MythologicalCreature.MINOS_INQUISITOR);
-            var jackpot = rare("Chimera");
+            roll.offerDrop(rare("Chimera"));
+            roll.offerDrop(drop("Ancient Claw"));
+
+            // This is the bug Evan reported, as an assertion: between the roll starting and the
+            // first column landing on the prize there must not be a single millisecond at which
+            // any column is stopped, and neither of the two phases that stop them may be reached.
+            for (long t = 0; t < J_LOCK_0; t++) {
+                clock.set(t);
+                assertEquals(List.of(false, false, false), locks(roll),
+                        "a reel stopped at t=" + t + " in state " + roll.state());
+                var state = roll.state();
+                assertTrue(state != RollState.LOCKING && state != RollState.SETTLED,
+                        "the lucky roll reached " + state + " at t=" + t + ", which is the stall");
+            }
+            clock.set(J_LOCK_0);
+            assertEquals(List.of(true, false, false), locks(roll),
+                    "and the first stop of the whole roll is the prize landing");
+        }
+
+        @Test
+        @DisplayName("an ordinary roll still shows the real drops, locked left to right")
+        void anOrdinaryRollShowsTheRealDrops() {
+            var clock = new FixedClock();
+            var roll = new SlotRoll(CFG, clock);
+            roll.start(MythologicalCreature.MINOS_INQUISITOR);
+            var big = drop("Chimera", 3);
             var common = drop("Ancient Claw");
-            roll.offerDrop(jackpot);
+            roll.offerDrop(big);
             roll.offerDrop(common);
 
             clock.set(LOCK_2);
             assertEquals(RollState.SETTLED, roll.state());
-            assertEquals(List.of(jackpot, common, jackpot), symbols(roll),
-                    "the ordinary symbol policy, unchanged: rare, then the other drop, then cycled");
+            assertEquals(List.of(big, common, big), symbols(roll),
+                    "the ordinary symbol policy, unchanged: biggest, then the other drop, then cycled");
             assertFalse(roll.inJackpotSequence());
         }
 
         @Test
-        @DisplayName("the jackpot flag latches in act one even though nothing on screen shows it")
+        @DisplayName("the jackpot flag latches during the spin even though nothing on screen shows it")
         void flagLatchesWithoutShowing() {
             var clock = new FixedClock();
             var roll = new SlotRoll(CFG, clock);
@@ -459,7 +529,8 @@ class SlotRollTest {
             var roll = lucky(clock, rare("Chimera"));
 
             clock.set(J_INTRO_START - 1);
-            assertEquals(RollState.SETTLED, roll.state());
+            assertEquals(RollState.SPINNING, roll.state(),
+                    "the millisecond before the gold, the machine is still simply spinning");
             clock.set(J_INTRO_START);
             assertEquals(RollState.JACKPOT_INTRO, roll.state());
             clock.set(J_SPIN_START - 1);
@@ -505,18 +576,24 @@ class SlotRollTest {
             var common = drop("Ancient Claw");
             var roll = lucky(clock, jackpot, common);
 
-            // The frame before act two, act one's real result is still standing and locked.
+            // The frame before act two the machine is mid-spin, with no symbol on any column and
+            // no gold anywhere. This used to read SETTLED with all three reels locked on the real
+            // loot: act two began at the end of the settle, so the columns had already stopped and
+            // been held for 2.5 seconds before the celebration could touch them. That stop is the
+            // thing the rework removed, so the assertion had to move with it -- what is still
+            // pinned here, and is the point of the test, is that the gold and the motion arrive
+            // together rather than one after the other.
             clock.set(J_INTRO_START - 1);
-            assertEquals(RollState.SETTLED, roll.state());
-            assertEquals(List.of(true, true, true), locks(roll));
-            assertEquals(List.of(jackpot, common, jackpot), symbols(roll));
+            assertEquals(RollState.SPINNING, roll.state());
+            assertEquals(List.of(false, false, false), locks(roll));
+            assertEquals(0.0d, roll.jackpotIntroProgress(), "and not a pixel of gold yet");
 
-            // The instant act two opens, every column breaks loose - the wash and the spin-up run
-            // together, so the machine is moving as it turns gold rather than changing colour first.
+            // The instant act two opens, the columns simply carry on - nothing unlocks, because
+            // nothing had locked - and the wash starts over the top of them.
             clock.set(J_INTRO_START);
             assertEquals(RollState.JACKPOT_INTRO, roll.state());
             assertEquals(List.of(false, false, false), locks(roll),
-                    "the reels break loose with the gold, not after it");
+                    "the reels turn through the gold rather than stopping for it");
             assertEquals(List.of(jackpot, jackpot, jackpot), symbols(roll),
                     "the destination is committed from the first frame of act two");
             assertTrue(roll.jackpotIntroProgress() < 1.0d, "the gold is still arriving");
@@ -609,8 +686,8 @@ class SlotRollTest {
             var clock = new FixedClock();
             var roll = lucky(clock, rare("Chimera"));
 
-            clock.set(SETTLE_END - 1);
-            assertEquals(0.0d, roll.jackpotIntroProgress(), "no gold while the real result is settled");
+            clock.set(J_INTRO_START - 1);
+            assertEquals(0.0d, roll.jackpotIntroProgress(), "no gold while the spin is still ordinary");
             clock.set(J_INTRO_START);
             assertEquals(0.0d, roll.jackpotIntroProgress());
             clock.set(J_INTRO_START + 100);
@@ -681,7 +758,8 @@ class SlotRollTest {
             var roll = lucky(clock, only);
 
             clock.set(LOCK_2);
-            assertEquals(List.of(only, only, only), symbols(roll), "act one already cycles it across");
+            assertEquals(List.of(only, only, only), symbols(roll),
+                    "by here the celebration is already under way and every column chases it");
             clock.set(J_LOCK_2);
             assertEquals(RollState.JACKPOT_HOLD, roll.state());
             assertEquals(List.of(only, only, only), symbols(roll));
@@ -788,8 +866,13 @@ class SlotRollTest {
     @DisplayName("how late a banner can arrive and still earn the celebration")
     class Lateness {
 
+        /**
+         * The late-banner path, which is now the only shape in which a celebrating roll stops at
+         * all. It used to wait out the whole settle before the celebration could start; it now
+         * starts on the banner, so the stop lasts exactly as long as Hypixel was late by.
+         */
         @Test
-        @DisplayName("a banner arriving after every reel locked still fires the whole sequence")
+        @DisplayName("a banner arriving after every reel locked fires the sequence on the spot")
         void bannerDuringSettleStillFires() {
             var clock = new FixedClock();
             var roll = new SlotRoll(CFG, clock);
@@ -797,20 +880,25 @@ class SlotRollTest {
             var common = drop("Ancient Claw");
             roll.offerDrop(common);
 
-            clock.set(LOCK_2 + 100);
+            long bannerAt = LOCK_2 + 100;
+            clock.set(bannerAt - 1);
             assertEquals(RollState.SETTLED, roll.state());
+            assertEquals(List.of(common, common, common), symbols(roll),
+                    "up to the banner this is an ordinary roll holding its ordinary result");
+
+            clock.set(bannerAt);
             var late = rare("Chimera");
             roll.offerDrop(late);
 
             assertTrue(roll.jackpot(), "the banner must not be swallowed just because it came last");
-            assertEquals(List.of(common, common, common), symbols(roll),
-                    "a locked act-one reel is never rewritten under the player");
+            assertEquals(RollState.JACKPOT_INTRO, roll.state(),
+                    "the celebration opens on the banner rather than waiting out the settle");
+            assertEquals(List.of(false, false, false), locks(roll),
+                    "and the columns that had landed rejoin the spin");
 
-            clock.set(SETTLE_END);
-            assertEquals(RollState.JACKPOT_INTRO, roll.state(), "the loot window may outlast the locks");
-            clock.set(J_LOCK_2);
+            clock.set(bannerAt + J_LOCK_2_OFFSET);
             assertEquals(List.of(late, late, late), symbols(roll));
-            clock.set(J_FADE_END);
+            clock.set(bannerAt + J_FADE_END_OFFSET);
             assertEquals(RollState.IDLE, roll.state());
         }
 
@@ -887,7 +975,8 @@ class SlotRollTest {
             var better = rare("Chimera", 9);
             roll.offerDrop(better);   // same millisecond, so still before the cutoff
 
-            clock.set(J_LOCK_2);
+            // This banner is late, so act two is rebased on it rather than on the first lock.
+            clock.set(SETTLE_END - 1 + J_LOCK_2_OFFSET);
             assertEquals(RollState.JACKPOT_HOLD, roll.state());
             assertEquals(better, roll.jackpotSymbol(), "armed by the first, headlined by the best");
         }
@@ -1065,7 +1154,10 @@ class SlotRollTest {
                 if (t == 900L) {
                     roll.offerDrop(drop("Mythological Bone Fragment", 5));
                 }
-                if (t == 1300L) {
+                // Deliberately after the last lock: the script has to walk every RollState, and
+                // LOCKING and SETTLED are now only reachable on a celebrating roll when the banner
+                // is late enough that some columns had already landed.
+                if (t == 1500L) {
                     roll.offerDrop(rare("Chimera"));
                 }
                 if (pollEveryMillis > 0 && t % pollEveryMillis == 0) {
@@ -1144,14 +1236,13 @@ class SlotRollTest {
             var d = rare("Crown of Greed");
             roll.offerDrop(d);
 
-            clock.advance(LOCK_2 - 1);
-            assertEquals(RollState.LOCKING, roll.state());
+            clock.advance(LOCK_0 - 1);
+            assertEquals(RollState.SPINNING, roll.state());
             clock.advance(1);
-            assertEquals(RollState.SETTLED, roll.state());
+            assertEquals(RollState.JACKPOT_INTRO, roll.state(),
+                    "the branch point is the first lock instant, wherever the clock's origin is");
             assertEquals(List.of(d, d, d), symbols(roll));
-            clock.advance(SETTLE_END - LOCK_2);
-            assertEquals(RollState.JACKPOT_INTRO, roll.state());
-            clock.advance(J_FADE_END - SETTLE_END);
+            clock.advance(J_FADE_END - J_INTRO_START);
             assertEquals(RollState.IDLE, roll.state());
         }
     }
@@ -1220,8 +1311,22 @@ class SlotRollTest {
         }
 
         @Test
-        @DisplayName("a one-reel machine steps straight from SPINNING to SETTLED, and skips JACKPOT_LOCK")
+        @DisplayName("a one-reel machine has no partial-lock phase in either act")
         void singleReelSkipsLocking() {
+            var ordinary = new FixedClock();
+            var plain = new SlotRoll(
+                    new SlotRollConfig(1, 500, 200, 3000, 300, 100, 100, 200, 50, 400), ordinary);
+            plain.start(MythologicalCreature.SPHINX);
+            var common = drop("Ancient Claw");
+            plain.offerDrop(common);
+
+            ordinary.set(499L);
+            assertEquals(RollState.SPINNING, plain.state());
+            ordinary.set(500L);
+            assertEquals(RollState.SETTLED, plain.state(),
+                    "there is no partial-lock phase with one reel");
+            assertEquals(List.of(common), symbols(plain));
+
             var clock = new FixedClock();
             var roll = new SlotRoll(
                     new SlotRollConfig(1, 500, 200, 3000, 300, 100, 100, 200, 50, 400), clock);
@@ -1231,18 +1336,15 @@ class SlotRollTest {
 
             clock.set(499L);
             assertEquals(RollState.SPINNING, roll.state());
-            clock.set(500L);
-            assertEquals(RollState.SETTLED, roll.state(), "there is no partial-lock phase with one reel");
-            assertEquals(List.of(d), symbols(roll));
-
-            clock.set(800L);        // settle ends at 500 + 300
+            clock.set(500L);        // the only lock instant, which is where act two branches off
             assertEquals(RollState.JACKPOT_INTRO, roll.state());
-            clock.set(900L);        // + intro 100
+            assertEquals(List.of(d), symbols(roll));
+            clock.set(600L);        // + intro 100
             assertEquals(RollState.JACKPOT_SPIN, roll.state());
-            clock.set(1100L);       // + spin 200: the only reel lands, so there is nothing to stagger
+            clock.set(800L);        // + spin 200: the only reel lands, so there is nothing to stagger
             assertEquals(RollState.JACKPOT_HOLD, roll.state(), "one column cannot land one at a time");
             assertEquals(List.of(d), symbols(roll));
-            clock.set(1600L);       // + hold 400 + fade 100
+            clock.set(1300L);       // + hold 400 + fade 100
             assertEquals(RollState.IDLE, roll.state());
         }
 
@@ -1257,12 +1359,12 @@ class SlotRollTest {
 
             clock.set(499L);
             assertEquals(RollState.SPINNING, roll.state());
-            clock.set(500L);
-            assertEquals(RollState.SETTLED, roll.state());
+            clock.set(500L);    // every reel would have locked here; instead act two opens
+            assertEquals(RollState.JACKPOT_INTRO, roll.state());
             assertEquals(5, roll.reels().size());
-            assertTrue(roll.reels().stream().allMatch(Reel::locked));
+            assertTrue(roll.reels().stream().noneMatch(Reel::locked));
 
-            clock.set(1100L);   // settle end 800, + intro 100 + spin 200: all five land at once
+            clock.set(1100L);   // act two opened at 500, + intro 100 + spin 200: all five land at once
             assertEquals(RollState.JACKPOT_HOLD, roll.state());
             assertTrue(roll.reels().stream().allMatch(Reel::locked));
         }
@@ -1277,14 +1379,19 @@ class SlotRollTest {
             roll.offerDrop(rare("Chimera"));
 
             long settleEnd = 500 + 2 * 100 + 300;   // 1000
+            // Act two opens at the first lock (500) and, having no duration at all, closes on the
+            // same instant: the columns land together on the prize and the roll is left with
+            // nothing but its fade. That fade is measured from the ordinary settle rather than from
+            // the collapsed celebration, so a lucky kill still holds the screen for exactly as long
+            // as an unlucky one -- being rewarded with a *shorter* animation would be absurd.
             clock.set(settleEnd - 1);
-            assertEquals(RollState.SETTLED, roll.state());
-            clock.set(settleEnd);
             assertEquals(RollState.FADING, roll.state(),
                     "a celebration with no duration is a celebration nobody sees");
             assertFalse(roll.inJackpotSequence());
+            clock.set(settleEnd);
+            assertEquals(RollState.FADING, roll.state());
             clock.set(settleEnd + 100);
-            assertEquals(RollState.IDLE, roll.state());
+            assertEquals(RollState.IDLE, roll.state(), "and the roll ends when it always would have");
         }
 
         @Test
@@ -1519,18 +1626,22 @@ class SlotRollTest {
             var roll = new SlotRoll(cfg, clock);
             roll.start(MythologicalCreature.MINOS_INQUISITOR);
             var settled = new LootDrop[5];
-            long settleEnd = 1000 + 4 * 200 + 500;   // 2300, where act one hands over
+            long settleEnd = 1000 + 4 * 200 + 500;   // 2300
+            long banner = settleEnd - 1;             // as late as a banner can be and still arm
 
-            // Strictly act one. At settleEnd act two opens and every reel deliberately breaks loose
-            // again to spin up under the gold wash, so "a lock is permanent" is an invariant of one
-            // act, not of the whole roll - jackpotLocksAreLeftToRightAndPermanent covers the other side.
-            for (long t = 0; t < settleEnd; t++) {
+            // The banner is deliberately at the last millisecond that still earns a celebration,
+            // because that is now the only shape in which all five columns land in act one at all:
+            // a banner during the spin opens act two at the first lock and no column ever stops.
+            // Once it does arrive every reel breaks loose to spin up under the gold, so "a lock is
+            // permanent" is an invariant of the ordinary act, not of the whole roll -
+            // jackpotLocksAreLeftToRightAndPermanent covers the other side.
+            for (long t = 0; t < banner; t++) {
                 clock.set(t);
                 if (t == 100L) {
                     roll.offerDrop(drop("Ancient Claw"));
                 }
                 if (t == 1300L) {
-                    roll.offerDrop(rare("Chimera"));       // lands between two locks
+                    roll.offerDrop(drop("Mythological Dye"));   // lands between two locks
                 }
                 if (t == 1900L) {
                     roll.offerDrop(drop("Griffin Feather", 40));
@@ -1557,13 +1668,16 @@ class SlotRollTest {
                 assertNotNull(settled[i], "reel " + i + " never locked");
             }
 
-            // And the handover itself: one millisecond earlier every reel was locked on act one's
-            // result; on the instant act two opens they are all turning again, with the gold only
-            // beginning to arrive. That overlap is the point - the machine moves as it goes gold.
-            clock.set(settleEnd - 1);
+            // And the handover itself: one millisecond earlier every reel was locked on the
+            // ordinary result; on the instant the late banner lands they are all turning again,
+            // with the gold only beginning to arrive. That overlap is the point - the machine moves
+            // as it goes gold.
+            clock.set(banner - 1);
             assertEquals(RollState.SETTLED, roll.state());
-            assertTrue(roll.reels().stream().allMatch(Reel::locked), "act one ends fully locked");
-            clock.set(settleEnd);
+            assertTrue(roll.reels().stream().allMatch(Reel::locked),
+                    "the ordinary act ends fully locked");
+            clock.set(banner);
+            roll.offerDrop(rare("Chimera"));
             assertEquals(RollState.JACKPOT_INTRO, roll.state());
             assertTrue(roll.reels().stream().noneMatch(Reel::locked),
                     "act two opens with every reel already spinning");
@@ -1643,8 +1757,10 @@ class SlotRollTest {
             roll.offerDrop(enormous);
 
             clock.set(LOCK_2);
-            assertEquals(emoji, symbols(roll).get(0), "rarity still wins whatever the name looks like");
-            assertEquals(enormous, symbols(roll).get(1));
+            assertEquals(List.of(emoji, emoji, emoji), symbols(roll),
+                    "rarity still wins whatever the name looks like");
+            assertTrue(roll.capturedDrops().contains(enormous),
+                    "and a 100k-character name is captured rather than rejected");
             clock.set(J_LOCK_2);
             assertEquals(emoji, roll.jackpotSymbol());
         }
@@ -1685,8 +1801,13 @@ class SlotRollTest {
                 assertTrue(roll.capturedDrops().contains(d));
 
                 clock.set(base + SETTLE_END);
-                assertEquals(kill % 3 == 0 ? RollState.JACKPOT_INTRO : RollState.FADING, roll.state(),
-                        "kill " + kill + " took the wrong branch at the settle boundary");
+                if (kill % 3 == 0) {
+                    assertTrue(roll.inJackpotSequence(),
+                            "kill " + kill + " took the ordinary branch despite its banner");
+                } else {
+                    assertEquals(RollState.FADING, roll.state(),
+                            "kill " + kill + " took the wrong branch at the settle boundary");
+                }
             }
             clock.set(20 * 10_000L + J_FADE_END + 1000);
             assertEquals(RollState.IDLE, roll.state());
