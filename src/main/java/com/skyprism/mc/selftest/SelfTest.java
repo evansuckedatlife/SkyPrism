@@ -22,8 +22,12 @@ import com.skyprism.mc.hud.SlotMachineHud;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
 
+import com.mojang.blaze3d.platform.Window;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
+
+import org.lwjgl.glfw.GLFW;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -166,6 +170,47 @@ public final class SelfTest {
      */
     private static final int PALETTE_GUI_SCALE = 2;
 
+    /**
+     * The window height the palette frames are photographed at, in real pixels.
+     *
+     * <p>Scale 2 on a 1080p window gets close to the whole ramp and then stops about five rows
+     * short, which is the one framing this screenshot cannot afford. The grid draws every level
+     * as its own cell, so the default range is 661 of them; at the twenty-three columns a
+     * 960-wide layout chooses that is twenty-nine rows, and 1080 minus the header and footer
+     * leaves room for twenty-four. Something has to fall off the frame, and both ends are
+     * load-bearing: the low levels are where the palette is recognisably Hypixel's, and the top
+     * is where the chroma band lives. The published 1.0.2 shot lost the bottom -- it opens at
+     * level 115, so the greys, whites and yellows that make the ramp familiar are simply not in
+     * the picture, and a reader is asked to believe the first fifth of it.</p>
+     *
+     * <p>Five extra rows is ninety scaled pixels, so the window is grown for the two palette
+     * frames and given straight back. Height only: the width fixes the column count and the
+     * whole point is that the columns stay where they are. 1440 leaves the range fitting with a
+     * row or two to spare rather than exactly, so a font metric that differs by a pixel on
+     * another machine cannot push the last row back off the bottom.</p>
+     *
+     * <p>Growing the window rather than dropping to GUI scale 1 keeps the cell text at the size
+     * it already was. Scale 1 would fit the range twice over and produce a palette nobody can
+     * read the numbers in, which defeats a screenshot whose subject is which level changed
+     * colour where.</p>
+     *
+     * <p>1340 is the measured fit rather than a round number. The grid comes out at 29 rows of
+     * 18 scaled pixels, so it needs 522 under a 66-pixel header and above a 44-pixel footer:
+     * 632 scaled, 1264 real. The extra 76 leaves a margin for a font whose line height differs
+     * by a pixel somewhere else without leaving a band of empty panel under the last row.</p>
+     */
+    private static final int PALETTE_WINDOW_HEIGHT = 1340;
+
+    /**
+     * How far under the requested height the borrowed window may land and still count.
+     *
+     * <p>Windows computes a client area from a window rect and loses a pixel doing it, so the
+     * request never lands exactly. The number is small on purpose: it has to absorb the frame
+     * arithmetic and nothing else, because the case worth failing on is a resize the window
+     * manager ignored outright, and that one comes back hundreds of pixels short.</p>
+     */
+    private static final int WINDOW_HEIGHT_SLACK = 8;
+
     /** Ordinary drops: nothing rare, so {@code SlotRoll.jackpot()} stays false. */
     private static final List<LootDrop> ORDINARY_DROPS = List.of(
             new LootDrop("Griffin Feather", "9", 1, false),
@@ -296,6 +341,30 @@ public final class SelfTest {
      * one on any machine whose display picks something else.</p>
      */
     private int borrowedGuiScaleFrom = Integer.MIN_VALUE;
+
+    /**
+     * The window height the palette frames borrow a taller one from, in real pixels.
+     *
+     * <p>{@link Integer#MIN_VALUE} means "nothing borrowed", exactly like
+     * {@link #borrowedGuiScaleFrom}. Only the height is remembered because only the height is
+     * changed; the width is left alone so the palette frames stay the same width as every other
+     * shot in the set.</p>
+     */
+    private int borrowedWindowHeightFrom = Integer.MIN_VALUE;
+
+    /** Whether {@link #borrowWindowHeight()} had to un-maximise the window to resize it. */
+    private boolean borrowedFromMaximised;
+
+    /**
+     * How many pixels short of the request the borrowed window actually came out.
+     *
+     * <p>Windows hands back a client area a pixel under what was asked for -- 1440 requested,
+     * 1439 drawn, and the PNG is the 1439. Harmless for the borrow, which is deliberately
+     * oversized, but the give-back has to land on the exact height the run started at or every
+     * screenshot after the palette pair comes out a pixel shorter than the ones it replaces.
+     * Measured once, on the real framebuffer, and added to the restore request.</p>
+     */
+    private int borrowedHeightShortfall;
 
     /**
      * The side-by-side pack comparison, created before anything is taught.
@@ -433,6 +502,37 @@ public final class SelfTest {
         // --- 2. the palette preview, twice, to catch chroma moving --------------------------
         // Scale first, then open: the grid measures its columns in init(), so a screen opened at
         // the old scale and rescaled afterwards would be laid out twice for no reason.
+        call("borrow window height " + PALETTE_WINDOW_HEIGHT + " for the palette frames",
+                this::borrowWindowHeight);
+        delay(LAYOUT_TICKS);
+        // The resize is a request to the window manager, and a window manager is free to ignore
+        // it -- Windows ignores one aimed at a maximised window and reports success. That is not
+        // a hypothetical: it happened, and the only trace was a palette PNG that was still 1080
+        // tall and still opened at level 115. Measure the framebuffer that the shot will actually
+        // be read off, so a resize that did not take stops the run instead of quietly shipping
+        // the framing this change exists to fix.
+        call("the window really is taller now", () -> {
+            Minecraft client = Minecraft.getInstance();
+            if (client == null) {
+                throw new Skipped("no client to measure");
+            }
+            Window window = client.getWindow();
+            int height = window.getHeight();
+            borrowedHeightShortfall = Math.max(0, PALETTE_WINDOW_HEIGHT - height);
+
+            // A pixel or two under the request is the window manager's frame arithmetic and is
+            // fine -- the height was chosen with 76 to spare. Anything more means the resize did
+            // not really happen, which is the failure this step exists to catch: it looks
+            // identical to success everywhere except in the height of the PNG.
+            if (borrowedHeightShortfall > WINDOW_HEIGHT_SLACK) {
+                throw new IllegalStateException("asked for " + PALETTE_WINDOW_HEIGHT
+                        + " real pixels of height and got " + window.getWidth() + "x" + height
+                        + "; the palette frame would be cropped to part of the ramp again");
+            }
+            return "framebuffer is " + window.getWidth() + "x" + height + " real pixels ("
+                    + borrowedHeightShortfall + " under the request, which the give-back adds"
+                    + " back), so the grid has room for every row";
+        });
         call("borrow GUI scale " + PALETTE_GUI_SCALE + " for the palette frames", this::borrowGuiScale);
         delay(LAYOUT_TICKS);
         call("open the level palette preview", () -> {
@@ -448,11 +548,15 @@ public final class SelfTest {
             SkyPrismConfig live = ConfigManager.get().config();
             int target = Math.max(0, live.levels.chromaMinLevel - CHROMA_LEAD_IN);
             preview.scrollToLevel(target);
-            return "scrolled to level " + target + ", so the grid straddles the chroma"
+            return "asked for level " + target + ", so the grid straddles the chroma"
                     + " threshold at " + live.levels.chromaMinLevel + ". Without this the"
                     + " screen sits on levels 0..89, every one of them below the threshold and"
                     + " therefore static, and the two frames below came out byte-identical"
-                    + " while the assertion beneath them still passed";
+                    + " while the assertion beneath them still passed. On the borrowed window"
+                    + " height the whole range fits, so scrollToLevel clamps this to the top and"
+                    + " the frame holds level " + preview.minLevel() + " through "
+                    + preview.maxLevel() + " at once; the request is kept because it is what"
+                    + " keeps the chroma band on screen if the grid ever needs scrolling again";
         });
         // The readback hands back the frame that was already on the GPU, so a shot taken in
         // the same tick as the scroll photographs the grid as it was *before* it moved. On the
@@ -503,6 +607,7 @@ public final class SelfTest {
         // Everything from here on is the slot machine and the settings screen, both of which want
         // the client's own scale back.
         call("give the GUI scale back", this::restoreGuiScale);
+        call("give the window height back", this::restoreWindowHeight);
         delay(LAYOUT_TICKS);
 
         // --- 3. the HUD placement screen ----------------------------------------------------
@@ -886,6 +991,19 @@ public final class SelfTest {
         config.levels.mode = shipped.levels.mode;
         config.levels.gradientPreset = shipped.levels.gradientPreset;
         config.levels.customStops.clear();
+
+        // The bracket table has to be pinned for exactly the reason the mode does, and it did not
+        // used to matter. While the shipped mode was GRADIENT the table was dead weight -- nothing
+        // rendered it, so a stale one in a developer's config could not reach a screenshot. The
+        // shipped mode is BRACKETS now, which makes this list *the palette*: pin the mode without
+        // pinning the table and the run photographs the new mode drawing the old colours.
+        //
+        // This is not hypothetical. The dev config in versions/26.2/run is a v4 file carrying the
+        // twenty-five-band fine table, and the v4->v5 guard deliberately keeps it (the player chose
+        // vanilla_plus, so the migration must not overwrite their palette). Correct for a player,
+        // wrong for a capture: without this line the two palette frames would show the previous
+        // default under the new default's name.
+        config.levels.brackets = new ArrayList<>(shipped.levels.brackets);
         config.levels.minLevel = LevelTagLocator.STANDARD_MIN;
         config.levels.maxLevel = LevelTagLocator.STANDARD_MAX;
 
@@ -926,6 +1044,9 @@ public final class SelfTest {
         SkyPrismConfig live = ConfigManager.get().config();
         return "in memory only (ConfigManager.refresh, no save): palette pinned to the shipped "
                 + "defaults (" + live.levels.mode + " " + live.levels.gradientPreset
+                + ", " + live.levels.brackets.size() + " brackets spanning "
+                + live.levels.brackets.get(0).minLevel() + ".."
+                + live.levels.brackets.get(live.levels.brackets.size() - 1).minLevel()
                 + ", recolourBrackets " + live.levels.recolourBrackets + "); chroma on from level "
                 + live.levels.chromaMinLevel + " at " + live.levels.chromaCyclesPerSecond
                 + " cycles/s; reels " + live.diana.reelCount + " x spin "
@@ -1266,6 +1387,108 @@ public final class SelfTest {
                 + client.getWindow().getGuiScaledHeight() + " scaled pixels";
     }
 
+    /**
+     * Grows the window to {@link #PALETTE_WINDOW_HEIGHT} so the whole ramp fits one frame.
+     *
+     * <p>Through GLFW rather than {@code Window.setWindowed}, which also decides monitors and
+     * fullscreen state: the only thing wanted here is a taller client area. The resize arrives
+     * as an ordinary window event, so the caller has to let a frame pass before photographing --
+     * the same rule the scroll below already obeys, and for the same reason.</p>
+     *
+     * <p>Safe with the window parked off-screen, which is where the background launcher puts it.
+     * A window larger than the monitor is only a problem for a window somebody has to look at.</p>
+     *
+     * <p><b>The un-maximise is not optional.</b> A maximised window is sized by the window
+     * manager, not by its owner, and Windows silently drops a resize aimed at one: the first run
+     * of this asked for 1440, was told the call succeeded, and photographed a 1080-tall
+     * framebuffer starting at level 115 exactly as before. Nothing failed and nothing warned --
+     * the only evidence was the height of the PNG. Restoring the window first is what makes the
+     * new size stick, and the flag below is what puts the developer's maximised window back.</p>
+     */
+    private String borrowWindowHeight() throws Skipped {
+        Minecraft client = Minecraft.getInstance();
+        if (client == null) {
+            throw new Skipped("no client, so there is no window to resize");
+        }
+        Window window = client.getWindow();
+        int before = window.getHeight();
+        if (before >= PALETTE_WINDOW_HEIGHT) {
+            return "window is already " + window.getWidth() + "x" + before
+                    + " real pixels, which is at least the " + PALETTE_WINDOW_HEIGHT
+                    + " the ramp needs; nothing borrowed";
+        }
+        if (borrowedWindowHeightFrom == Integer.MIN_VALUE) {
+            borrowedWindowHeightFrom = before;
+            borrowedFromMaximised =
+                    GLFW.glfwGetWindowAttrib(window.handle(), GLFW.GLFW_MAXIMIZED) == GLFW.GLFW_TRUE;
+        }
+        int width = window.getWidth();
+
+        // Where the window is now, so it can be put straight back in the same call that resizes
+        // it. This run is deliberately parked off-screen so it never takes over the display of
+        // whoever is sitting in front of it, and every route to a resize is also a route to a
+        // reposition -- so the position is carried through rather than left to the window
+        // manager's idea of where a restored window belongs.
+        int[] atX = new int[1];
+        int[] atY = new int[1];
+        GLFW.glfwGetWindowPos(window.handle(), atX, atY);
+
+        if (borrowedFromMaximised) {
+            GLFW.glfwRestoreWindow(window.handle());
+        }
+
+        // glfwSetWindowMonitor with a null monitor, not glfwSetWindowSize. The plain resize is
+        // advisory -- it was tried first, reported success, and left the framebuffer at 1080 --
+        // whereas this is the call that re-establishes the window's mode, and it sets position
+        // and size in one shot so there is no frame where the window has moved somewhere
+        // visible. GLFW_DONT_CARE for the refresh rate: it is only read in fullscreen.
+        GLFW.glfwSetWindowMonitor(window.handle(), 0L, atX[0], atY[0],
+                width, PALETTE_WINDOW_HEIGHT, GLFW.GLFW_DONT_CARE);
+
+        int[] fbW = new int[1];
+        int[] fbH = new int[1];
+        GLFW.glfwGetFramebufferSize(window.handle(), fbW, fbH);
+        return "asked for " + width + "x" + PALETTE_WINDOW_HEIGHT + " real pixels, up from "
+                + window.getWidth() + "x" + before + "; GLFW now reports a framebuffer of "
+                + fbW[0] + "x" + fbH[0]
+                + (borrowedFromMaximised ? " (un-maximised first)" : " (was not maximised)")
+                + ", position held at " + atX[0] + "," + atY[0]
+                + ". Borrowed for the palette frames only and given back below";
+    }
+
+    /** Puts back whatever {@link #borrowWindowHeight()} took, and is a no-op if it never ran. */
+    private String restoreWindowHeight() {
+        if (borrowedWindowHeightFrom == Integer.MIN_VALUE) {
+            return "nothing was borrowed";
+        }
+        int original = borrowedWindowHeightFrom;
+        boolean remaximise = borrowedFromMaximised;
+        int shortfall = borrowedHeightShortfall;
+        borrowedWindowHeightFrom = Integer.MIN_VALUE;
+        borrowedFromMaximised = false;
+        borrowedHeightShortfall = 0;
+        Minecraft client = Minecraft.getInstance();
+        if (client == null) {
+            return "no client left to restore on";
+        }
+        Window window = client.getWindow();
+        int[] atX = new int[1];
+        int[] atY = new int[1];
+        GLFW.glfwGetWindowPos(window.handle(), atX, atY);
+        // Plus the shortfall the borrow measured, so the client area comes back to exactly the
+        // height the run started at rather than a pixel under it. Every screenshot after this
+        // one is read off that framebuffer.
+        GLFW.glfwSetWindowMonitor(window.handle(), 0L, atX[0], atY[0],
+                window.getWidth(), original + shortfall, GLFW.GLFW_DONT_CARE);
+        // Deliberately not re-maximised even when the borrow un-maximised it. Maximising snaps
+        // the window back onto a monitor, and this one is parked off-screen on purpose; the size
+        // it started at is restored, which is the part that could outlive the run.
+        return "asked for " + (original + shortfall) + " to land back on " + original
+                + " real pixels, position held at " + atX[0] + "," + atY[0]
+                + (remaximise ? " (left un-maximised: re-maximising would drag an off-screen"
+                        + " window back onto the desktop)" : "");
+    }
+
     /** Names the auto setting, because "0" on its own reads as a broken value in the summary. */
     private static String describeGuiScale(int value) {
         return value == 0 ? "0 (auto)" : String.valueOf(value);
@@ -1329,6 +1552,11 @@ public final class SelfTest {
             restoreGuiScale();
         } catch (Throwable stuck) {
             LOGGER.warn("SkyPrism self test could not give the GUI scale back", stuck);
+        }
+        try {
+            restoreWindowHeight();
+        } catch (Throwable stuck) {
+            LOGGER.warn("SkyPrism self test could not give the window height back", stuck);
         }
 
         Path summary = null;

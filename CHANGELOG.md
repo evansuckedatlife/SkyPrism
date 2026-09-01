@@ -4,6 +4,114 @@ All notable changes to SkyPrism are recorded here. Versions follow the
 `<mod version>+<minecraft version>` scheme used by the jar names, so `1.0.0` below ships as
 `skyprism-1.0.0+26.1.2.jar` and `skyprism-1.0.0+26.2.jar`.
 
+## 1.0.3 — 2026-08-31
+
+### The default level palette changed
+
+**SkyPrism now colours the `[451]` prefix in hard bands rather than a smooth rainbow, and every
+band below 480 is one of Hypixel's own colours.** Read this first, because it changes what you see
+the moment you launch:
+
+- **If you had already changed your palette** — a different mode, a different preset, one edited
+  stop anywhere — **you keep exactly what you had.** Nothing in your `levels` group is touched.
+- **If you never touched it**, updating moves you onto the new palette. That is deliberate rather
+  than incidental: every config on disk spells out `"mode": "GRADIENT"` explicitly, so a changed
+  default alone would have reached new installs and nobody else — leaving the people who asked for
+  this change running the palette they objected to while strangers got the fix.
+- **Either way it is one dropdown away from being undone.**
+
+1.0.0 shipped `GRADIENT` on `spectrum`: 300° of hue, a different colour for every single level, the
+whole way up. It did what it was built to do, and three players said the same thing about the
+published screenshot independently — it was too much, and it threw away a scale they already read
+fluently. Hypixel's own is thirteen colours, one every 40 levels, and people use it to size someone
+up at a glance.
+
+The shipped default is now `BRACKETS` on a 37-band table:
+
+- **0–479: 24 bands, one every 20 levels, in Hypixel's own colours.** Every other band lands exactly
+  on a real Hypixel tier colour, on the level Hypixel switches at; the band between two of them is
+  the Oklab midpoint of that pair. Twice the resolution of the server's own scheme, with no colour
+  in it that Hypixel did not choose or that does not sit directly between two that it did.
+- **480–600: 13 bands, one every 10 levels, in SkyPrism's own colours.** 480 is Hypixel's *last*
+  tier — level 480 and every level above it, forever, are the same `0xAA0000` dark red. Nothing up
+  here is being overwritten, so this is where the finest bands and the invented hues go, and it is
+  where telling two players apart is worth the most.
+- **Above 600 the top band holds**, the same way Hypixel's dark red holds above 480. It is also
+  where chroma starts if you switch it on, which it still is not by default.
+
+37 bands against the 64-entry table cap, so there is room to split one without deleting another.
+
+Nothing was taken away. `GRADIENT` is one dropdown entry away, all eleven ramps are still
+registered — `spectrum` included, unchanged — and `VANILLA` still reproduces Hypixel's thirteen
+tiers exactly.
+
+### Config schema v5
+
+Nothing about the JSON shape moved, which is unusual for a version bump. What moved is the shipped
+palette, and because `ConfigCodec` writes every field on every save, a changed initialiser reaches
+nobody who already has a config file. So the step carries the change itself, and the whole of it is
+one question: did you ever choose a palette?
+
+A `levels` group still holding the pre-v5 default in **all four** of its parts — `mode`,
+`gradientPreset`, `customStops` and `brackets`, each either absent or still exactly what v4 shipped
+— moves to `BRACKETS` on the new table. Any one of them differing leaves the whole group alone. One
+edited stop is enough, including a stop that is inert because the preset is not `custom`: somebody
+who has been in the palette settings moving colours around has an opinion, and the step has no
+business guessing which parts of it they meant.
+
+`mode: "BRACKETS"` is **not** migrated either, even though bracket mode is the new default — a v4
+user in bracket mode chose it, quite possibly for v4's 25-band table exactly as it stood, and the
+new table should arrive from the reset arrow rather than from underneath them.
+
+The one thing the leave-alone case still writes: a chosen palette with **no `mode` key** was in
+`GRADIENT`, because that is what absent meant in v4, and absent now means `BRACKETS`. That gets
+written out explicitly so the file cannot lose a gradient on the strength of a key it never had.
+Every outcome is logged. Running the step twice does nothing the second time.
+
+### Also
+
+- Settings-screen tooltips for the mode and the two bracket lists now describe the shipped table
+  rather than treating brackets as a niche mode.
+- `docs/CONFIG.md` documents the new defaults, the band table and the v4 → v5 row, and its
+  "walked up to v3" line — stale since v4 — is corrected.
+- `docs/MODRINTH.md` added: the ready-to-paste Modrinth listing, with absolute image URLs, the
+  dependency mapping and the two jar names.
+
+## 1.0.2 — 2026-08-31
+
+### Every name the reels can show is now a real SkyBlock item
+
+A player reported the slot machine showing loot that does not belong to what rolled it. They were
+right, and the audit that followed found the mechanism: the per-source drop tables had been
+assembled by reading wikis and inferring, and about a hundred of the 476 names in them were not the
+names of anything. "Chimera" is an enchantment. "Lord Jawbus" is a sea creature, not a drop. "Armor
+of Yog Helmet" is an internal id rather than a display name. There is no Ashfang armour set, no Soul
+Esperance, no Reindrake Fragment, no golden goblin egg. Every one of them survived several review
+passes, because a fake name compiles, ships, and is visible only to a SkyBlock player watching a
+reel go past.
+
+- **The drop tables were rebuilt** — from the NotEnoughUpdates item repository, the community's
+  canonical SkyBlock item database, and from the wiki's per-mob drop tables, instead of from memory.
+  `assets/skyprism/drop_symbols.json` now carries 403 rows over 509 drop names onto 266 distinct
+  vanilla items, 66 of them glinted.
+- **A fake item name is now a build failure.** `src/test/resources/skyblock/skyblock_item_names.tsv`
+  is a snapshot of real display names, generated from the NEU repository by `SkyBlockNames#main`
+  — 8,726 distinct names — and stamped with the repository path and the date it was read. Every
+  name in the per-source jackpot lists, in `drop_symbols.json` and in the filler strips has to be in
+  that snapshot, or on an allowlist carrying a written reason why a real thing is absent from an
+  item database: currencies, the six Catacombs reward-chest tiers, the Carnival's dig-board fruits.
+  The allowlist is deliberately awkward to grow — each entry has to argue for itself, and its
+  argument is what gets printed when the row goes stale.
+- Four families of name are expanded when the snapshot is built, because NEU stores them in a form
+  chat never prints: pets (`[Lvl {LVL}] Griffin` is dropped as "Griffin"), enchanted books (the book
+  itself displays as "Enchanted Book" and the enchantment's own name lives in its lore, so both the
+  tiered form and the bare stem are recorded), trophy fish (four graded items per species, where the
+  mod names the species), and the roman-numeral stem of anything else tiered, the runes included.
+
+The hundred corrections are not the point. The point is that nothing before this stopped the next
+hundred: a reviewer cannot hold 7,600 SkyBlock item names in their head, and "the name looked fine
+to me" is exactly the failure this replaces with a machine holding the real list.
+
 ## 1.0.1 — 2026-08-31
 
 ### Reel filler now matches the source that is rolling

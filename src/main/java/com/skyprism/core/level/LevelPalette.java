@@ -72,18 +72,25 @@ public final class LevelPalette {
     }
 
     /**
-     * The default palette: {@link PalettePresets#defaultRamp()} with no shimmer.
+     * The default palette: {@link PalettePresets#defaultBrackets()} with no shimmer.
      *
-     * <p>The same ramp the shipped config names, so a client that never loaded a config file and
-     * one that loaded the defaults draw identical tags. They used to differ -- this fell back to
-     * {@code vanillaPlus()} while the config asked for the wider ramp -- which made the first
-     * frames after a failed config read a different colour from every frame after it.
+     * <p>The same mode and the same table the shipped config names, so a client that never loaded
+     * a config file and one that loaded the defaults draw identical tags. They used to differ --
+     * this fell back to {@code vanillaPlus()} while the config asked for the wider ramp -- which
+     * made the first frames after a failed config read a different colour from every frame after
+     * it. That is why the mode moved here in lockstep when the shipped default changed from a
+     * gradient to a table: leaving this on {@link LevelColorMode#GRADIENT} would have rebuilt
+     * exactly the same bug in a new place.
+     *
+     * <p>{@link PalettePresets#defaultRamp()} still rides along in the unused ramp slot, so a
+     * caller that flips the mode without reloading a config gets the shipped gradient rather
+     * than a null.
      *
      * @return a palette safe to use before any config has been loaded
      */
     public static LevelPalette defaults() {
-        return new LevelPalette(LevelColorMode.GRADIENT, PalettePresets.defaultRamp(),
-            PalettePresets.fineBrackets(), false, Integer.MAX_VALUE, null);
+        return new LevelPalette(LevelColorMode.BRACKETS, PalettePresets.defaultRamp(),
+            PalettePresets.defaultBrackets(), false, Integer.MAX_VALUE, null);
     }
 
     /**

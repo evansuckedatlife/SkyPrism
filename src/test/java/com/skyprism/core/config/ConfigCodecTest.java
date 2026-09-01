@@ -54,7 +54,11 @@ class ConfigCodecTest {
     private static SkyPrismConfig customised() {
         var c = SkyPrismConfig.defaults();
         c.debugLogging = true;
-        c.levels.mode = LevelColorMode.BRACKETS;
+        // GRADIENT rather than the shipped BRACKETS on purpose: this fixture exists to
+        // differ from the defaults in every group, and a field set to the default value is
+        // a field the round trip is no longer testing. It moved here when brackets became
+        // the shipped mode.
+        c.levels.mode = LevelColorMode.GRADIENT;
         c.levels.gradientPreset = LevelSettings.CUSTOM_PRESET;
         c.levels.customStops = new ArrayList<>(List.of(
                 new GradientRamp.Stop(0, 0x102030),
@@ -358,7 +362,7 @@ class ConfigCodecTest {
                   """.formatted(SkyPrismConfig.CONFIG_VERSION));
             var result = ConfigCodec.load(file());
             assertEquals(ConfigCodec.Status.LOADED, result.status());
-            assertEquals(LevelColorMode.GRADIENT, result.config().levels.mode);
+            assertEquals(LevelColorMode.BRACKETS, result.config().levels.mode);
             assertEquals(HudAnchor.TOP_CENTER, result.config().hud.anchor);
             assertEquals(List.of(MythologicalCreature.MINOTAUR, MythologicalCreature.MANTICORE),
                     List.copyOf(result.config().diana.triggers));

@@ -10,19 +10,35 @@ you and draws it differently. It never sends anything to Hypixel.
 
 ## What it actually does
 
-### 1. Every level gets its own colour
+### 1. Twice as many level colours below 480, and thirteen new ones above it
 
 Hypixel gives your `[451]` level prefix one of **13** colours, changing once every 40 levels. So a
-level 200 and a level 239 look identical, and most of the range sits in similar greens and aquas.
+level 200 and a level 239 look identical. And 480 is Hypixel's *last* tier — level 480, level 537 and
+level 600 are all the same dark red, forever.
 
-SkyPrism replaces that with a gradient where **every single level is a different colour** — level 391
-and level 392 are genuinely distinct — computed in a perceptual colour space so the ramp reads evenly
-instead of going muddy through the middle. Applies in chat, in TAB, and optionally above heads.
+SkyPrism raises the resolution without throwing the scheme away.
+
+**Below 480 the colour changes every 20 levels instead of every 40, and it changes to Hypixel's own
+colours.** Every other band is a real tier colour on the exact level Hypixel switches at; the band
+between two of them is the midpoint of that pair, mixed in a perceptual colour space so it doesn't
+go muddy on the way across. The colours you already read stay where they are. There are twice as
+many of them.
+
+**Above 480 it changes every 10 levels**, in thirteen colours of SkyPrism's own — rose up through
+violet to cyan, alternating vivid and pale so that even ten levels apart is obvious. That is the
+stretch Hypixel paints one flat red, so nothing here is being overwritten and it is where telling two
+players apart is worth the most.
+
+Applies in chat, in TAB, and optionally above heads.
 
 ![The level palette preview](docs/images/level-palette.png)
 
 That's `/skyprism preview`, showing the live palette. The underline marks where animated chroma kicks
-in. There are presets if you don't want to fiddle, and a full colour picker if you do.
+in — it ships off, and starts at level 600 when you switch it on.
+
+Want something else? The mode is a dropdown: **Gradient** gives every single level its own shade
+along one of eleven ramps, **Vanilla** reproduces Hypixel's thirteen tiers untouched, and every band
+and every stop is editable with a colour picker.
 
 ### 2. Lucky drops become a slot machine
 
@@ -55,7 +71,8 @@ configurable.
 
 1. Minecraft **26.1.2** (or 26.2) with **Fabric Loader 0.19.3+** and **Java 25**
 2. [Fabric API](https://modrinth.com/mod/fabric-api)
-3. `skyprism-1.0.0+26.1.2.jar` from [Releases](../../releases) → your `mods/` folder
+3. `skyprism-1.0.3+26.1.2.jar` (or `skyprism-1.0.3+26.2.jar`) from [Releases](../../releases)
+   → your `mods/` folder
 4. *Optional but recommended:* [YACL](https://modrinth.com/mod/yacl) and
    [Mod Menu](https://modrinth.com/mod/modmenu) for the settings screen
 
@@ -79,7 +96,7 @@ You don't need a Diana mayor, a dungeon run, or any luck at all:
 | Command | What it does |
 | --- | --- |
 | `/skyprism` | Status: what's on, what's off, where the config lives |
-| `/skyprism preview` | The level palette, browsable 0–600 |
+| `/skyprism preview` | The level palette, browsable from 0 to past the chroma threshold — 0–660 on shipped defaults, or give it your own `[min] [max]` |
 | `/skyprism hud` | Drag the machine into position |
 | `/skyprism simulate <source> [drops…]` | Run any source's full pipeline offline |
 | `/skyprism sources` | Every source, its policy, and whether its gate is open right now |
@@ -94,7 +111,7 @@ so you can see whether the mod thinks you're somewhere else.
 
 ![The settings screen](docs/images/settings-levels.png)
 
-Mod Menu → SkyPrism. Colours (gradient / bracket table / vanilla, presets, chroma, which surfaces),
+Mod Menu → SkyPrism. Colours (bracket table / gradient / vanilla, presets, chroma, which surfaces),
 per-source roll policies grouped by category, HUD position and scale, and sounds. Full reference in
 [docs/CONFIG.md](docs/CONFIG.md).
 
@@ -151,7 +168,7 @@ Needs **JDK 25** (the daemon JVM is pinned via `gradle/gradle-daemon-jvm.propert
 provisioned or located for you). It's a [Stonecutter](https://stonecutter.kikugie.dev/) project: one
 source tree builds both Minecraft versions, currently with **zero** version-conditional code.
 
-3450 tests run across both versions. The core logic is deliberately Minecraft-free so it tests on a
+4510 tests run across both versions. The core logic is deliberately Minecraft-free so it tests on a
 bare JVM in about a second.
 
 There's also an in-client self test that opens every screen and screenshots it — every image in this

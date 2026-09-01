@@ -136,7 +136,7 @@
   "skyprism.config.levels.enabled": "Recolour level tags",
   "skyprism.config.levels.enabled.desc": "The master switch for level tag colouring. Off leaves Hypixel's own colours alone on every surface, and costs nothing at runtime.",
   "skyprism.config.levels.mode": "Colouring mode",
-  "skyprism.config.levels.mode.desc": "Gradient gives every level its own shade along a smooth ramp. Brackets keeps hard tiers but lets you choose them. Vanilla reproduces Hypixel's thirteen stock tiers exactly, which is the one to pick if you only want the chroma effect.",
+  "skyprism.config.levels.mode.desc": "Brackets is what the mod ships on: hard bands, and the shipped table changes colour every 20 levels below 480 in Hypixel's own thirteen colours, then every 10 levels from 480 to 600 where Hypixel has only dark red. Gradient blends instead, so every single level is its own shade along a ramp. Vanilla reproduces Hypixel's thirteen stock tiers exactly, which is the one to pick if you only want the chroma effect.",
   "skyprism.config.levels.recolour_brackets": "Recolour the brackets too",
   "skyprism.config.levels.recolour_brackets.desc": "On, the square brackets around the number are recoloured with it. Off, only the digits change and the brackets stay as Hypixel sent them.",
 
@@ -152,15 +152,15 @@
   "skyprism.config.levels.apply_nametags.desc": "Recolour level tags on the names floating over players in the world. Turn this off if you want coloured levels in the interface but Hypixel's own colours in the world itself.",
 
   "skyprism.config.levels.preset": "Gradient preset",
-  "skyprism.config.levels.preset.desc": "Picking a preset copies its stops into the two lists below, ready to tweak. Choose \"custom\" to keep your own stops and stop tracking a preset. \"spectrum\" is the default: an even hue sweep across the whole level range, so two players forty levels apart are obviously different colours. \"vanilla_plus\" is Hypixel's own thirteen tiers smoothed out, which is familiar but spends much of its range in similar greens and aquas. \"aurora\", \"ocean\", \"sunset\", \"ember\", \"toxic\", \"neon\" and \"candy\" are narrower moods, and \"mono\" and \"rainbow\" are the two extremes.",
+  "skyprism.config.levels.preset.desc": "Picking a preset copies its stops into the two lists below, ready to tweak. Choose \"custom\" to keep your own stops and stop tracking a preset. \"spectrum\" is the default ramp, drawn as soon as you switch the mode to Gradient: an even hue sweep across the whole level range, so two players forty levels apart are obviously different colours. \"vanilla_plus\" is Hypixel's own thirteen tiers smoothed out, which is familiar but spends much of its range in similar greens and aquas. \"aurora\", \"ocean\", \"sunset\", \"ember\", \"toxic\", \"neon\" and \"candy\" are narrower moods, and \"mono\" and \"rainbow\" are the two extremes.",
   "skyprism.config.levels.stop_levels": "Gradient stop levels",
   "skyprism.config.levels.stop_levels.desc": "The level each colour below is anchored to. Levels between two stops get a blend of their colours, so a handful of stops covers every level. Row 1 here pairs with row 1 of the colour list underneath.",
   "skyprism.config.levels.stop_colours": "Gradient stop colours",
   "skyprism.config.levels.stop_colours.desc": "One colour per stop level above, in the same order. The blend between them is done in Oklab, so a red-to-green ramp passes through clean yellows instead of the muddy browns a plain RGB fade gives you.",
   "skyprism.config.levels.bracket_levels": "Bracket start levels",
-  "skyprism.config.levels.bracket_levels.desc": "The lowest level in each tier. A level takes the colour of the highest tier it reaches, so tiers starting at 0, 100 and 200 colour level 150 with the 100 row's colour.",
+  "skyprism.config.levels.bracket_levels.desc": "The lowest level in each band of the table the mod ships on. A level takes the colour of the highest band it reaches, so bands starting at 0, 100 and 200 colour level 150 with the 100 row's colour. There are 37 shipped - one every 20 levels up to 480, then one every 10 up to 600 - and room for 64, so you can split a band you care about without deleting one you do not.",
   "skyprism.config.levels.bracket_colours": "Bracket colours",
-  "skyprism.config.levels.bracket_colours.desc": "One flat colour per tier above, in the same order. No blending happens in this mode - every level in a tier is exactly this colour.",
+  "skyprism.config.levels.bracket_colours.desc": "One flat colour per band above, in the same order. No blending happens in this mode - every level in a band is exactly this colour. Below 480 the shipped ones are Hypixel's own tier colours and the midpoints between them, so the scale still reads the way you are used to; above 480, where Hypixel gives every level the same dark red, they are SkyPrism's own.",
 
   "skyprism.config.levels.group.chroma": "Chroma",
   "skyprism.config.levels.group.chroma.desc": "An animated rainbow shimmer for high levels. It replaces the palette colour rather than tinting it, so a shimmering tag reads as \"this player is off the top of your scale\". Shimmering tags cannot be cached between frames, so keep the threshold high enough that only a few players in a busy lobby qualify.",

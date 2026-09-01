@@ -57,7 +57,7 @@ thread. The value you see in the screen after a reload is the repaired one, not 
 
 | Screen | JSON key | Default | Range | What it does |
 |---|---|---|---|---|
-| — | `configVersion` | `4` | clamped 1–4 | Schema version of the file. Written by the mod; see [Versioning](#versioning-and-migration). |
+| — | `configVersion` | `5` | clamped 1–5 | Schema version of the file. Written by the mod; see [Versioning](#versioning-and-migration). |
 | — | `debugLogging` | `false` | boolean | Intended as extra logging of parse decisions for someone reporting a mis-detected tag. **It is carried through load, save, copy and equality but no code in the mod currently reads it**, so turning it on changes nothing today. |
 
 Neither appears in the settings screen.
@@ -75,7 +75,7 @@ The `[451]` prefix recolour. Screen category **Levels**; JSON group `levels`.
 | Screen | JSON key | Default | Range | What it does |
 |---|---|---|---|---|
 | Recolour level tags | `levels.enabled` | `true` | boolean | Master switch. Off leaves Hypixel's own thirteen tier colours alone everywhere. |
-| Colouring mode | `levels.mode` | `GRADIENT` | `GRADIENT`, `BRACKETS`, `VANILLA` | Which of the three colour sources is live. `GRADIENT` interpolates a ramp so 250 and 251 are a hair apart; `BRACKETS` gives every level inside a band one flat colour; `VANILLA` reproduces Hypixel's own 13 forty-level tiers byte for byte. |
+| Colouring mode | `levels.mode` | `BRACKETS` | `GRADIENT`, `BRACKETS`, `VANILLA` | Which of the three colour sources is live. `BRACKETS` gives every level inside a band one flat colour, and is the shipped mode — see [defaults worth knowing about](#defaults-worth-knowing-about) for the table it ships with and why. `GRADIENT` interpolates a ramp instead, so 250 and 251 are a hair apart. `VANILLA` reproduces Hypixel's own 13 forty-level tiers byte for byte. |
 | Recolour the brackets too | `levels.recolourBrackets` | `true` | boolean | Whether the `[` and `]` take the level colour, or stay exactly as Hypixel drew them so only the digits change. Turn it **off** for Hypixel's own dim-bracket styling. See [defaults worth knowing about](#defaults-worth-knowing-about). |
 
 ### Where to apply it
@@ -103,9 +103,9 @@ guarantee.
 
 | Screen | JSON key | Default | Range | What it does |
 |---|---|---|---|---|
-| Gradient preset | `levels.gradientPreset` | `"spectrum"` | `spectrum`, `vanilla_plus`, `aurora`, `ocean`, `sunset`, `ember`, `toxic`, `neon`, `candy`, `rainbow`, `mono`, `custom` | Which shipped ramp `GRADIENT` mode draws with, or `custom` to use `customStops`. Read only in `GRADIENT` mode. Names are normalised on load: case is folded and a space becomes an underscore, and anything still unrecognised falls back to `spectrum`. |
+| Gradient preset | `levels.gradientPreset` | `"spectrum"` | `spectrum`, `vanilla_plus`, `aurora`, `ocean`, `sunset`, `ember`, `toxic`, `neon`, `candy`, `rainbow`, `mono`, `custom` | Which shipped ramp `GRADIENT` mode draws with, or `custom` to use `customStops`. Read only in `GRADIENT` mode, which is not the shipped mode, so changing this does nothing until you switch `levels.mode` over. Names are normalised on load: case is folded and a space becomes an underscore, and anything still unrecognised falls back to `spectrum`. |
 | Gradient stop levels / Gradient stop colours | `levels.customStops` | the 16 `spectrum` stops | 1–64 entries | Your own ramp: a list of `{ "level": int, "rgb": int }`. Used when `gradientPreset` is `"custom"`. Seeded from whatever the default preset is, so switching to `custom` starts from what you were already looking at. |
-| Bracket start levels / Bracket colours | `levels.brackets` | 25 stops at 20-level intervals, 0–480 | 1–64 entries | Your own step table: a list of `{ "minLevel": int, "rgb": int }`. Used in `BRACKETS` mode. |
+| Bracket start levels / Bracket colours | `levels.brackets` | 37 bands: 0–479 every 20 levels, then 480–600 every 10 | 1–64 entries | Your own step table: a list of `{ "minLevel": int, "rgb": int }`. Used in `BRACKETS` mode — which is the shipped mode, so this is the table a fresh install actually draws with. Where the 37 come from is in [defaults worth knowing about](#defaults-worth-knowing-about). |
 
 Both tables are sanitised the same way. Levels are clamped to 0–999,999,999, the list is sorted by
 level, duplicates are dropped (first one at a level wins, and the de-duplication runs *after* the
@@ -126,7 +126,7 @@ not currently looking at.
 
 | Key | Range | Character |
 |---|---|---|
-| `spectrum` | 0–600 | **The default.** 300° of hue at a fixed perceptual lightness — teal, green, gold, orange, coral, pink, magenta, violet, sky. |
+| `spectrum` | 0–600 | **The default ramp**, drawn the moment you switch to `GRADIENT`. 300° of hue at a fixed perceptual lightness — teal, green, gold, orange, coral, pink, magenta, violet, sky. |
 | `vanilla_plus` | 0–480 | Hypixel's own thirteen tier colours as gradient stops, smoothed between them. The familiar look. |
 | `aurora` | 0–500 | Blue, teal, green, violet, pink. A northern-lights sweep. |
 | `ocean` | 0–600 | Pale aqua down through teal and azure into a vivid deep blue. |
@@ -154,8 +154,14 @@ added later:
   4.5 bar would fail the preset whose entire job is to reproduce Hypixel. It is set to catch the
   failure that actually happens: a navy or deep-violet band that vanishes completely against TAB.
   `sunset` used to open on `0x4B2E83` and scored 1.7:1; its first stop was lifted to a legible
-  lightness at the same hue, and the rest of that ramp is untouched. The default preset is held to
-  7.0:1 on top of that, because it is the one ramp nobody chose.
+  lightness at the same hue, and the rest of that ramp is untouched. `spectrum` is held to 7.0:1 on
+  top of that, because it is the ramp `GRADIENT` gives someone who has not picked one.
+
+The shipped bracket table is measured the same way, on a split bar that says plainly what the table
+is: SkyPrism wrote the colours above 480, so they are held to the same 7.0:1 as `spectrum`. Below
+480 it is reproducing Hypixel's own hexes on purpose, and those clear only the 2.0 floor —
+`0xAA00AA` at level 360 measures 2.85:1 and is the table's worst case. Raising that bar would mean
+abandoning the vanilla list, which is the one thing players asked us not to do.
 
 ### Chroma
 
@@ -597,14 +603,45 @@ something players already recognise rather than a new look. Then the mod was run
 and looked at, and the fully coloured tag won. Turn this **off** to get Hypixel's dim-bracket
 styling back.
 
+### `mode` defaults to `BRACKETS`
+
+A fresh install draws hard bands, not a continuous ramp.
+
+1.0.0 through 1.0.2 shipped `GRADIENT` on `spectrum`: a different colour for every single level,
+across the whole range. It did what it was built to do, and three separate players said the same
+thing about it — it was too much, and it threw away a scale they already read fluently. Hypixel's
+own scheme is thirteen colours, one every 40 levels, and players use it to size someone up at a
+glance. Replacing all of it asks them to relearn that, including across the part of the range where
+Hypixel's answer was fine.
+
+So the shipped table keeps Hypixel's scale and doubles its resolution, and spends colours SkyPrism
+picked itself only where Hypixel has run out of its own:
+
+| Levels | Bands | Where the colours come from |
+|---|---|---|
+| 0–479 | 24, one every 20 levels | Hypixel's thirteen tier colours, sampled off `vanilla_plus`. Every other band lands exactly on a real tier colour at the level Hypixel changes at, and the band between two of them is the Oklab midpoint of that pair. Nothing here is invented, and every landmark you already know is where you left it. |
+| 480–600 | 13, one every 10 levels | SkyPrism's own — the only colours in the shipped table that are not Hypixel's. 480 is Hypixel's **last** tier: level 480 and every level above it, forever, are the same `0xAA0000` dark red, so there is nothing up here to be faithful to. An even hue sweep from 350° down to 212° — rose, magenta, orchid, violet, periwinkle, cornflower, sky, cyan — with lightness **alternating** vivid and pale band to band. The alternation is load-bearing: at 10-level spacing the hue step alone puts neighbours 0.018 apart in Oklab, under the ~0.02 where two colours stop being tellable apart, and the lightness swap takes that to 0.119. |
+| above 600 | flat | The top band holds, exactly as Hypixel's dark red does above 480. It is also where chroma starts if you switch it on. |
+
+37 bands against a cap of 64, so there is room left to insert your own.
+
+`GRADIENT` is one dropdown entry away and every ramp that ever shipped is still in it, `spectrum`
+included. If you had already changed your palette before updating, you keep exactly what you had; if
+you never touched it, the update moves you onto this table. Which one you get, and why it is decided
+that way, is in [Versioning](#versioning-and-migration).
+
 ### `gradientPreset` defaults to `spectrum`, not `vanilla_plus`
 
-Same story, same reason. Shipping Hypixel's own hues was the familiar choice, and familiarity lost
-to what the tag actually looks like in TAB: Hypixel's thirteen tiers spend levels 120 through 300
-walking green → dark green → aqua → dark aqua, so a third of the live level range reads as one
-blue-green smear and two players eighty levels apart look alike. `spectrum` travels 300° of hue over
-0–600 at a fixed perceptual lightness instead, which is what makes forty levels a visible
-difference. `vanilla_plus` is still one dropdown entry away.
+This one only bites once you have switched to `GRADIENT`, but it is the same argument pointed at a
+different mode. Shipping Hypixel's own hues was the familiar choice, and familiarity lost to what
+the tag actually looks like in TAB: Hypixel's thirteen tiers spend levels 120 through 300 walking
+green → dark green → aqua → dark aqua, so a third of the live level range reads as one blue-green
+smear and two players eighty levels apart look alike. `spectrum` travels 300° of hue over 0–600 at a
+fixed perceptual lightness instead, which is what makes forty levels a visible difference.
+`vanilla_plus` is still one dropdown entry away.
+
+The mode default moved in 1.0.3 and this one did not, deliberately: somebody who goes out of their
+way to pick the smooth ramp is asking for exactly the thing `spectrum` does.
 
 ### `applyToNameTags` defaults to `false`
 
@@ -624,7 +661,7 @@ not — the field initialiser in `SkyPrismConfig` is `false`. The comment is sta
 
 ## Versioning and migration
 
-`configVersion` is the schema version. The current version is **4**. It is bumped only when the JSON
+`configVersion` is the schema version. The current version is **5**. It is bumped only when the JSON
 *shape* changes in a way a straight Gson bind would get wrong — a renamed field, a changed unit, a
 re-keyed enum, or a field whose *meaning* narrowed. Adding a field never needs a bump on its own,
 because an absent field already falls back to its initialiser.
@@ -632,13 +669,14 @@ because an absent field already falls back to its initialiser.
 Migrations run on the parsed JSON tree *before* Gson binds it, because the mistakes worth catching
 are invisible afterwards: a renamed field binds to nothing and the choice silently vanishes, and a
 field whose unit changed binds perfectly and is off by a factor of fifty. Steps are registered one
-version apart and applied in sequence, so a file three releases old walks 1 → 2 → 3 → 4.
+version apart and applied in sequence, so a file four releases old walks 1 → 2 → 3 → 4 → 5.
 
 | Step | What it rewrites |
 |---|---|
 | v1 → v2 | `levels.chroma` → `levels.chromaEnabled` (a rename; bound as-is, a player who had the shimmer on would find it off). `diana.lootWindowTicks` → `diana.lootWindowMillis`, **multiplying by 50**; bound as-is the number would be accepted without complaint and the window would be fifty times too short. |
 | v2 → v3 | Writes `levels.chromaSaturation = 0.90` and `levels.chromaLightness = 0.62` into a file that has a `levels` object but not those keys. Those are the constants every build up to v2 hard-coded, so the file records what that install was actually rendering and a later retune of the defaults reaches new installs without silently repainting existing ones. |
 | v3 → v4 | `diana.enabled = false` also writes `loot.enabled = false`, and `diana.suppressDropChatLines = true` also writes `loot.suppressDropChatLines = true`. Neither field moved and neither is removed — what changed is what they *mean*. |
+| v4 → v5 | Nothing in the JSON *shape* moved; the shipped palette did. A `levels` group still holding v4's default palette in all four of its parts — `mode`, `gradientPreset`, `customStops`, `brackets` — is moved onto the new one. A group where any one of them was edited is left alone, except that an absent `mode` key is written out as `"GRADIENT"`, because absent used to mean gradient and now means brackets. |
 
 ### Why v3 → v4 exists
 
@@ -656,6 +694,43 @@ Nothing else moves. The `diana` group is untouched, because the Diana path still
 behaviour must be identical before and after the upgrade. The per-source table starts empty, which
 means every new source sits at its shipped default and a later release can still correct a default
 it got wrong.
+
+### Why v4 → v5 exists
+
+Nothing about the JSON moved here. What moved is the shipped palette: up to v4 SkyPrism drew a
+per-level gradient, and from v5 it draws the 37-band table. **A migration step is the only way that
+change reaches anybody who already has the mod.** `ConfigCodec` writes every field on every save, so
+every config on disk already spells out `"mode": "GRADIENT"` and `"gradientPreset": "spectrum"`, and
+Gson binds both over the new initialisers before anything reads them. Flipping the defaults alone
+would have reached new installs and nobody else — and the three people who asked for this change are
+already running the mod. They would have kept the exact palette they objected to while strangers got
+the fix.
+
+So the step asks one question: **did you ever choose a palette?**
+
+- **No** — the `levels` group still holds the pre-v5 default in *all four* of its parts at once
+  (`mode`, `gradientPreset`, `customStops`, `brackets`, each either absent or still exactly what v4
+  shipped). Your palette moves to `BRACKETS` on the new 37-band table, and the load says so in the
+  log.
+- **Yes** — any one of those four differs. Nothing in the group is touched. One edited stop is
+  enough, including a stop that is inert because the preset is not `custom`: someone who has been in
+  the palette settings moving colours around has an opinion, and this step has no business guessing
+  which parts of it they meant.
+
+Two edges are deliberate.
+
+`mode: "BRACKETS"` **is not migrated either**, even though bracket mode is the new default. A v4
+user in bracket mode chose it, and what they chose may well have been v4's 25-band table exactly as
+it stood. The new table is one click of the config screen's reset arrow away, on purpose, rather
+than arriving from underneath them.
+
+And in the leave-alone case the step still writes one thing: a file with a chosen palette but **no
+`mode` key** was in `GRADIENT`, because that is what absent meant in v4 — and after the flip, absent
+means `BRACKETS`. Left alone it would lose the gradient it was drawing, on the strength of a key it
+never had. So the old default is written in explicitly, and nothing else in the group moves.
+
+A `levels` group carrying none of the four keys is skipped entirely: the bind that follows already
+hands it the v5 palette, and writing it in would be noise.
 
 Every step acts only when the old key is present and the new one is not, so running it twice, or on
 a file where you already made the change yourself, is a no-op. A file with no `levels` object at all
@@ -692,7 +767,7 @@ a file it could not understand until a copy of that file is somewhere you can ge
 | Present but unreadable (an OS-level read failure, e.g. a transient Windows lock) | `RECOVERED` | Defaults for this session. The file is **not** moved and **not** overwritten — it may well work next launch. |
 | Not valid JSON, not a JSON object, empty, or a setting has a type Gson cannot coerce | `RECOVERED` | The file is renamed aside, defaults are written in its place, and the load reports where the wreckage went. |
 | Renamed aside was impossible | `RECOVERED` | Defaults for this session, and **nothing is written**. Losing a palette for one session is recoverable; destroying the only copy is not. |
-| Older schema | `MIGRATED` | Walked up to v3 and rewritten. |
+| Older schema | `MIGRATED` | Walked up to v5, one version at a time, and rewritten. |
 | Newer schema | `FROM_NEWER_VERSION` | Read as far as possible, file untouched. |
 
 The preserved copy is `config.json.corrupt`, then `config.json.corrupt-1`, `-2` and so on up to 99.

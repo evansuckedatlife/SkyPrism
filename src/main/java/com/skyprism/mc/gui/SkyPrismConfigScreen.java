@@ -946,17 +946,31 @@ final class SkyPrismConfigScreen {
         return out;
     }
 
+    /**
+     * The bracket table the reset arrow restores, which must be the one the mod ships.
+     *
+     * <p>These two feed {@code .binding(default, getter, setter)}, so YACL treats what they
+     * return as "unchanged" and hands it back when the reset arrow is clicked. That makes them
+     * the third place the shipped table is named, after the field initialiser and the
+     * sanitiser, and the only one with no test watching it. When the default moved off
+     * {@code fineBrackets()} and these stayed behind, the reset arrow would have written a
+     * table the mod no longer ships anywhere else - a config the user cannot get back to by
+     * any other route, produced by the one control whose whole job is "put it back".
+     * {@link PalettePresets#defaultBrackets()} is the single name for the shipped table; read
+     * it here rather than naming a preset.</p>
+     */
     private static List<Integer> defaultBracketLevels() {
         List<Integer> out = new ArrayList<>();
-        for (BracketTable.Bracket bracket : PalettePresets.fineBrackets().brackets()) {
+        for (BracketTable.Bracket bracket : PalettePresets.defaultBrackets().brackets()) {
             out.add(bracket.minLevel());
         }
         return out;
     }
 
+    /** @see #defaultBracketLevels() */
     private static List<Color> defaultBracketColours() {
         List<Color> out = new ArrayList<>();
-        for (BracketTable.Bracket bracket : PalettePresets.fineBrackets().brackets()) {
+        for (BracketTable.Bracket bracket : PalettePresets.defaultBrackets().brackets()) {
             out.add(new Color(bracket.rgb()));
         }
         return out;

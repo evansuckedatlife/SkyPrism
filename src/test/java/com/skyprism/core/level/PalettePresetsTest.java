@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.skyprism.core.config.SkyPrismConfig;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -49,14 +50,39 @@ class PalettePresetsTest {
     private static final double MIN_CONTRAST = 2.0;
 
     /**
-     * The much higher bar the shipped default is held to.
+     * The much higher bar SkyPrism's own colours are held to.
      *
-     * <p>The default is the one ramp a player never chose, so it has to be readable without
-     * anyone having thought about it. {@code spectrum} is built to hold a fixed perceptual
-     * lightness across the whole hue sweep, which is exactly what makes a number this high
-     * achievable at all.
+     * <p>The default is the one palette a player never chose, so it has to be readable without
+     * anyone having thought about it. Both {@code spectrum} and the 480+ half of the shipped
+     * table are built to hold a controlled perceptual lightness across their hue sweep, which
+     * is exactly what makes a number this high achievable at all.
      */
     private static final double MIN_DEFAULT_CONTRAST = 7.0;
+
+    /** Where Hypixel's scale runs out and SkyPrism's own bands take over. */
+    private static final int TOP_TIER_LEVEL = 480;
+
+    /**
+     * The floor adjacent SkyPrism bands hold, derived from what the sweep actually yields.
+     *
+     * <p>Measured worst neighbour gap across levels 480..600 is 0.119 in Oklab, so this bar
+     * sits just under it: a hue or lightness edit that meaningfully closes the bands up fails,
+     * while the design as shipped has no slack it did not earn. For scale, ~0.02 is roughly
+     * where two colours stop being tellable apart side by side, and the same 138-degree arc
+     * walked at one fixed lightness measures 0.018 between neighbours -- which is the whole
+     * reason the lightness alternates.
+     */
+    private static final double MIN_BAND_STEP = 0.11;
+
+    /**
+     * The floor adjacent vanilla-half brackets hold.
+     *
+     * <p>Lower than {@link #MIN_BAND_STEP} because this half is not SkyPrism's to tune: the
+     * tightest pair is levels 100 and 120 at 0.084, both sampled straight off Hypixel's own
+     * green run. The bar exists to catch a bracket that got dropped or duplicated, not to
+     * grade colours the mod deliberately inherited.
+     */
+    private static final double MIN_VANILLA_STEP = 0.08;
 
     /** Highest level any shipped ramp is designed for; above it {@link GradientRamp} clamps. */
     private static final int TOP_LEVEL = 600;
@@ -107,6 +133,139 @@ class PalettePresetsTest {
         for (int i = 0; i < TIERS.length; i++) {
             assertEquals(TIERS[i], fine.colorAt(i * 40), "tier " + i);
         }
+    }
+
+    // ------------------------------------------------- the shipped default table
+
+    @Test
+    @DisplayName("defaultBrackets is 37 entries: 24 vanilla every 20, then 13 SkyPrism every 10")
+    void defaultTableHasTheShippedShape() {
+        var table = PalettePresets.defaultBrackets();
+        var brackets = table.brackets();
+        assertEquals(37, brackets.size(), "24 below 480 plus 13 from 480 to 600");
+        assertTrue(brackets.size() <= SkyPrismConfig.LevelSettings.MAX_TABLE_ENTRIES,
+            "the shipped table must fit inside the cap the config parser enforces, so a user "
+                + "who opens the table editor on it can still add rows");
+
+        assertEquals(0, brackets.get(0).minLevel());
+        assertEquals(TOP_LEVEL, brackets.get(brackets.size() - 1).minLevel(),
+            "the table terminates at 600, which is also the shimmer's first level -- one number, "
+                + "not two free to drift apart");
+
+        for (BracketTable.Bracket b : brackets) {
+            if (b.minLevel() < TOP_TIER_LEVEL) {
+                assertEquals(0, b.minLevel() % 20, "vanilla-half bracket " + b.minLevel());
+            } else {
+                assertEquals(0, b.minLevel() % 10, "SkyPrism band " + b.minLevel());
+            }
+        }
+        // No gaps and no repeats in either half.
+        for (int i = 1; i < brackets.size(); i++) {
+            int expected = brackets.get(i - 1).minLevel()
+                + (brackets.get(i).minLevel() > TOP_TIER_LEVEL ? 10 : 20);
+            assertEquals(expected, brackets.get(i).minLevel(), "bracket " + i + " boundary");
+        }
+    }
+
+    @Test
+    @DisplayName("everything below 480 is fineBrackets byte for byte -- no new colours down there")
+    void defaultTableInheritsTheVanillaHalfUnchanged() {
+        // pil4: "everything before 480 should stay as it was before, and only after the custom
+        // ones". This is that promise as an assertion. The bands are not re-sampled off
+        // vanillaPlus by a second loop that happens to agree; they are the same objects.
+        var fine = PalettePresets.fineBrackets().brackets();
+        var shipped = PalettePresets.defaultBrackets().brackets();
+        for (int i = 0; i < 24; i++) {
+            assertEquals(fine.get(i).minLevel(), shipped.get(i).minLevel(), "boundary " + i);
+            assertEquals(fine.get(i).rgb(), shipped.get(i).rgb(),
+                "band " + (i * 20) + " strayed from the vanilla hexlist");
+        }
+        // The even bands are still real Hypixel tier colours, all the way to the red at 440.
+        for (int i = 0; i * 40 < TOP_TIER_LEVEL; i++) {
+            assertEquals(TIERS[i], PalettePresets.defaultBrackets().colorAt(i * 40), "tier " + i);
+        }
+        // 479 is the last vanilla level, and it draws the last vanilla band: the midpoint
+        // between the 440 red and the dark red, exactly as fineBrackets does.
+        assertEquals(PalettePresets.fineBrackets().colorAt(479),
+            PalettePresets.defaultBrackets().colorAt(479));
+        assertEquals(0xD43330, PalettePresets.defaultBrackets().colorAt(479));
+    }
+
+    @Test
+    @DisplayName("480 leaves the red corner instead of dead-ending in it")
+    void theFourEightyCellIsTheWholeChange() {
+        int shipped = PalettePresets.defaultBrackets().colorAt(TOP_TIER_LEVEL);
+
+        // What an unmodded client draws at 480, and the least legible colour on Hypixel's whole
+        // scale: vanilla escalates 320..480 by going darker and then stops there forever.
+        for (int tier : TIERS) {
+            assertTrue(contrastAgainstDarkUi(0xAA0000) <= contrastAgainstDarkUi(tier),
+                "premise check: no vanilla tier is harder to read than the 480 dark red");
+        }
+        double fromDarkRed = oklabDistance(shipped, 0xAA0000);
+        assertTrue(fromDarkRed >= 0.30,
+            "480 is only " + fromDarkRed + " from the dark red it replaces");
+
+        // And it has to read as new against the colour the eye actually compares it to: the
+        // level-440 red sitting one band below it in this same table.
+        double fromRed = oklabDistance(shipped, 0xFF5555);
+        assertTrue(fromRed >= 0.13, "480 is only " + fromRed + " from the 440 red above it");
+        assertEquals(0xFF5555, PalettePresets.defaultBrackets().colorAt(440), "premise check");
+    }
+
+    @Test
+    @DisplayName("no two neighbouring brackets in the default table blur together")
+    void defaultTableNeighboursStayApart() {
+        var brackets = PalettePresets.defaultBrackets().brackets();
+        for (int i = 1; i < brackets.size(); i++) {
+            BracketTable.Bracket lo = brackets.get(i - 1);
+            BracketTable.Bracket hi = brackets.get(i);
+            double d = oklabDistance(lo.rgb(), hi.rgb());
+            double bar = hi.minLevel() > TOP_TIER_LEVEL ? MIN_BAND_STEP : MIN_VANILLA_STEP;
+            assertTrue(d >= bar, () -> String.format(
+                "brackets %d (#%06X) and %d (#%06X) are only %.4f apart; bar is %.2f",
+                lo.minLevel(), lo.rgb(), hi.minLevel(), hi.rgb(), d, bar));
+        }
+        // And no colour appears twice anywhere in the table, near or far.
+        for (int i = 0; i < brackets.size(); i++) {
+            for (int j = i + 1; j < brackets.size(); j++) {
+                assertTrue(brackets.get(i).rgb() != brackets.get(j).rgb(),
+                    "brackets " + brackets.get(i).minLevel() + " and "
+                        + brackets.get(j).minLevel() + " are the same colour");
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("above 480 the alternating lightness, not the hue step, is what separates bands")
+    void theBandsAlternateLightnessBecauseTheHueStepAloneIsTooSmall() {
+        var brackets = PalettePresets.defaultBrackets().brackets();
+        var bands = brackets.subList(24, brackets.size());
+        assertEquals(13, bands.size());
+
+        double worstLightnessSwing = Double.MAX_VALUE;
+        for (int i = 1; i < bands.size(); i++) {
+            double a = Oklab.srgbToOklab(bands.get(i - 1).rgb())[0];
+            double b = Oklab.srgbToOklab(bands.get(i).rgb())[0];
+            worstLightnessSwing = Math.min(worstLightnessSwing, Math.abs(a - b));
+        }
+        // 0.109 measured. Ten levels of hue is 11.5 degrees, which on its own moves a colour
+        // about 0.018 -- under the ~0.02 where two colours stop being tellable apart. Nearly
+        // all of the 0.119 neighbours actually differ by is this swing, so if the alternation
+        // ever flattens out the bands collapse into each other whatever the hues say.
+        final double swing = worstLightnessSwing;
+        assertTrue(swing >= 0.09,
+            () -> "the lightness alternation has flattened to " + swing);
+
+        // Same-lightness bands two apart are 23 degrees of hue and nothing else, and they are
+        // the closest pairs in the table -- which is the evidence for the paragraph above.
+        double worstSameParity = Double.MAX_VALUE;
+        for (int i = 0; i + 2 < bands.size(); i++) {
+            worstSameParity = Math.min(worstSameParity,
+                oklabDistance(bands.get(i).rgb(), bands.get(i + 2).rgb()));
+        }
+        assertTrue(worstSameParity < swing,
+            "two bands apart at equal lightness ought to be closer than one band apart across it");
     }
 
     // ------------------------------------------------------------- the default
@@ -247,8 +406,8 @@ class PalettePresetsTest {
     }
 
     @Test
-    @DisplayName("the default preset clears a far higher legibility bar than the floor")
-    void theDefaultIsComfortablyLegible() {
+    @DisplayName("the default gradient clears a far higher legibility bar than the floor")
+    void theDefaultGradientIsComfortablyLegible() {
         var ramp = PalettePresets.defaultRamp();
         for (int level = 0; level <= TOP_LEVEL; level++) {
             int rgb = ramp.colorAt(level);
@@ -257,6 +416,23 @@ class PalettePresetsTest {
             assertTrue(k >= MIN_DEFAULT_CONTRAST, () -> String.format(
                 "the default ramp is only %.2f:1 at level %d (#%06X); bar is %.2f",
                 k, at, rgb, MIN_DEFAULT_CONTRAST));
+        }
+    }
+
+    @Test
+    @DisplayName("the default table: every bracket clears the floor, and SkyPrism's own clear 7.0")
+    void theDefaultTableIsLegibleOnBothItsHalves() {
+        // The split is the honest statement of what this table is. SkyPrism wrote the colours
+        // above 480 and holds them to the same bar as spectrum; below 480 it is reproducing
+        // Hypixel's hexes on purpose, and those cannot clear 7.0 -- 0xAA00AA at level 360
+        // measures 2.85 and is the table's floor. Lifting it would mean abandoning the vanilla
+        // list, which is the one thing users asked us not to do.
+        for (BracketTable.Bracket b : PalettePresets.defaultBrackets().brackets()) {
+            double k = contrastAgainstDarkUi(b.rgb());
+            double bar = b.minLevel() >= TOP_TIER_LEVEL ? MIN_DEFAULT_CONTRAST : MIN_CONTRAST;
+            assertTrue(k >= bar, () -> String.format(
+                "default table bracket at %d (#%06X) is %.2f:1; bar for that half is %.2f",
+                b.minLevel(), b.rgb(), k, bar));
         }
     }
 
@@ -315,6 +491,7 @@ class PalettePresetsTest {
         assertSame(PalettePresets.vanillaPlus(), PalettePresets.vanillaPlus());
         assertSame(PalettePresets.vanillaBrackets(), PalettePresets.vanillaBrackets());
         assertSame(PalettePresets.fineBrackets(), PalettePresets.fineBrackets());
+        assertSame(PalettePresets.defaultBrackets(), PalettePresets.defaultBrackets());
         assertSame(PalettePresets.rainbow(), PalettePresets.rainbow());
         assertSame(PalettePresets.ocean(), PalettePresets.ocean());
         assertSame(PalettePresets.ember(), PalettePresets.ember());

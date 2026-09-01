@@ -64,19 +64,34 @@ class SkyPrismConfigTest {
         }
 
         @Test
-        @DisplayName("a fresh install draws the spectrum ramp with the whole tag coloured")
-        void theTwoLevelDefaultsAreWhatTheUserChose() {
+        @DisplayName("a fresh install draws the default bracket table with the whole tag coloured")
+        void theLevelDefaultsAreWhatTheUsersChose() {
             var levels = SkyPrismConfig.defaults().levels;
+
+            // Every assertion here is a decision made in response to someone looking at the
+            // mod running, not a preference expressed in the abstract, so each one is pinned
+            // against a refactor quietly putting it back.
+
+            // Players said the per-level gradient recoloured far too often, so brackets are
+            // the shipped mode and the shipped table is the one built for that complaint.
+            assertEquals(LevelColorMode.BRACKETS, levels.mode,
+                "the shipped palette is a bracket table, not a gradient");
+            assertEquals(PalettePresets.defaultBrackets().brackets(), levels.brackets,
+                "and it is the table that keeps Hypixel's scheme below 480");
+            assertEquals(PalettePresets.defaultBrackets().brackets(),
+                levels.resolveTable().brackets(),
+                "what the default resolves to is the same table it was seeded from");
+
+            // The gradient did not go anywhere; it sits behind the mode switch, still on
+            // spectrum, because Hypixel's own tiers are too samey through the middle.
             assertEquals(PalettePresets.DEFAULT_PRESET_NAME, levels.gradientPreset);
             assertEquals(LevelSettings.DEFAULT_PRESET, levels.gradientPreset);
             assertSame(PalettePresets.defaultRamp(), levels.resolveRamp());
-            // Both of these were flipped after the mod was looked at on a live server:
-            // Hypixel's own tiers were too samey through the middle of the range, and the
-            // dim-bracket styling lost to the fully coloured tag. Pinned so neither drifts
-            // back on a refactor.
+
+            // The dim-bracket styling lost to the fully coloured tag.
             assertTrue(levels.recolourBrackets, "the whole tag is coloured by default");
             assertEquals(PalettePresets.defaultRamp().stops(), levels.customStops,
-                "custom stops start from what the player is already looking at");
+                "custom stops start from the ramp the mode switch would show");
         }
 
         @Test
@@ -427,7 +442,7 @@ class SkyPrismConfigTest {
             c.levels.brackets = new ArrayList<>();
             var clean = c.sanitized();
             assertEquals(PalettePresets.defaultRamp().stops(), clean.levels.customStops);
-            assertEquals(PalettePresets.fineBrackets().brackets(), clean.levels.brackets);
+            assertEquals(PalettePresets.defaultBrackets().brackets(), clean.levels.brackets);
         }
 
         @Test
@@ -501,7 +516,7 @@ class SkyPrismConfigTest {
             c.levels.mode = null;
             c.hud.anchor = null;
             var clean = c.sanitized();
-            assertEquals(LevelColorMode.GRADIENT, clean.levels.mode);
+            assertEquals(LevelColorMode.BRACKETS, clean.levels.mode);
             assertEquals(HudAnchor.TOP_CENTER, clean.hud.anchor);
         }
 
@@ -699,7 +714,7 @@ class SkyPrismConfigTest {
             var levels = new LevelSettings();
             levels.mode = LevelColorMode.BRACKETS;
             levels.brackets = new ArrayList<>();
-            assertSame(PalettePresets.fineBrackets(), assertDoesNotThrow(levels::resolveTable));
+            assertSame(PalettePresets.defaultBrackets(), assertDoesNotThrow(levels::resolveTable));
         }
     }
 

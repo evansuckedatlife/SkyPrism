@@ -1,12 +1,18 @@
 package com.skyprism.core.config;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import com.skyprism.core.level.BracketTable;
+import com.skyprism.core.level.GradientRamp;
+import com.skyprism.core.level.LevelColorMode;
+import com.skyprism.core.level.PalettePresets;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -20,12 +26,25 @@ import java.util.Map;
  * old magnitude -- has already been discarded. Rewriting the tree first means the bind
  * that follows sees a file that looks like it was written by this build.
  *
+ * <p><b>Most rungs exist because the shape changed. One exists because a default did.</b>
+ * {@link ConfigCodec} serialises every field, so a setting a player has never touched is
+ * still written into their file in full, spelled out, and Gson binds it back over the
+ * initialiser on the next load. That is what makes an added field free -- and it is also
+ * what makes a <em>changed</em> default land on new installs only. When a default changes
+ * because existing players asked for it to, the file on disk is the thing standing in the
+ * way. The version is the only evidence in that file of which build's opinion the value
+ * was: a value equal to the old default in a file written before the change was almost
+ * certainly never chosen, and the same value in a file written after it certainly was.
+ * {@link #v4ToV5(JsonObject)} is that rung, and it is deliberately the narrowest reading
+ * of "never chosen" that still catches an untouched install.
+ *
  * <p><b>The ladder.</b> Steps are registered one version apart and applied in sequence,
  * so a file three releases old walks 1 to 2 to 3 rather than needing a bespoke 1-to-3
  * path. Every step is written to be safe on a file that has already been partly
- * hand-edited: it acts only when the old key is present and the new one is not, so
- * running it twice, or on a file where the user already renamed the key themselves, is
- * a no-op rather than a data loss.
+ * hand-edited: it acts only on evidence that the value in front of it is still the one
+ * this build wrote -- the old key present and the new one absent, or a value still equal
+ * to the default it was shipped with -- so running it twice, or on a file where the user
+ * already made the change themselves, is a no-op rather than a data loss.
  *
  * <p>A file from a <em>newer</em> build than this one is left completely alone. There is
  * no honest way to downgrade a schema this code has never seen, and guessing would
@@ -159,6 +178,7 @@ public final class ConfigMigrations {
         steps.put(1, ConfigMigrations::v1ToV2);
         steps.put(2, ConfigMigrations::v2ToV3);
         steps.put(3, ConfigMigrations::v3ToV4);
+        steps.put(4, ConfigMigrations::v4ToV5);
         return Map.copyOf(steps);
     }
 
@@ -291,6 +311,192 @@ public final class ConfigMigrations {
         return changes.isEmpty() ? null : "v3->v4: " + String.join(", ", changes);
     }
 
+    /**
+     * v4 to v5: the level palette default changed, so a file that never chose a palette is
+     * moved onto the new one and a file that did choose is left completely alone.
+     *
+     * <p><b>Why a migration is the only way this reaches anyone.</b> Nothing about the JSON
+     * shape moved here. What moved is the shipped default: SkyPrism drew a per-level
+     * gradient up to v4 and draws {@link PalettePresets#defaultBrackets()} from v5.
+     * {@link ConfigCodec} writes every field, so every config on disk already spells out
+     * {@code "mode": "GRADIENT"} and {@code "gradientPreset": "spectrum"}, and Gson binds
+     * both over the new initialisers before anything reads them. Flipping the defaults
+     * alone would therefore have reached new installs and nobody else -- and the change was
+     * asked for by three people who are already running the mod. They would have kept the
+     * exact palette they objected to while strangers got the fix.
+     *
+     * <p><b>What counts as "never chose".</b> Only a palette that is the pre-v5 default in
+     * every one of its four parts at once: the mode, the gradient name, the custom stops,
+     * and the bracket table, each either absent or still holding the value v4 shipped. One
+     * edited stop anywhere is enough to stop this step, even a stop that is inert because
+     * the preset is not {@code custom} -- someone who has been in the palette settings
+     * moving colours around has an opinion about their palette, and this step has no
+     * business guessing which parts of it they meant.
+     *
+     * <p><b>{@code mode: "BRACKETS"} is deliberately not migrated either</b>, even though
+     * the new default is bracket mode. A v4 user in bracket mode chose it, and what they
+     * chose it for may well have been the twenty-level {@link PalettePresets#fineBrackets()}
+     * table exactly as it stands. They get the new table from the config screen's reset
+     * arrow, on purpose, rather than from underneath them.
+     *
+     * <p><b>The one thing this step writes in the leave-alone case.</b> A v4 file with a
+     * chosen palette but no {@code mode} key was in {@link LevelColorMode#GRADIENT}, because
+     * that is what absent meant in v4 -- and after the flip, absent means
+     * {@link LevelColorMode#BRACKETS}. Left untouched, that file would lose the gradient it
+     * was drawing on the strength of a key it never had. So the old default is written in
+     * explicitly. Nothing else in the group moves.
+     *
+     * <p><b>Why the new table is read live rather than frozen the way v2's constants are.</b>
+     * {@link #v2ToV3(JsonObject)} pins numbers describing what an old install
+     * <em>rendered</em>, which is history and must never move again. This step does the
+     * opposite job: it hands a file the palette this build ships. If a later release retunes
+     * {@link PalettePresets#defaultBrackets()} it will need its own rung and its own
+     * judgement about whose table to touch, and until then a migrated file and a fresh
+     * install must agree -- which they only do if both read the same source.
+     * {@link PalettePresets#fineBrackets()} on the recognising side is a shipped preset with
+     * its shape pinned by its own tests, and it is what v4 seeded {@code brackets} from.
+     */
+    private static String v4ToV5(JsonObject root) {
+        JsonObject levels = childObject(root, "levels");
+        if (levels == null) {
+            return null;
+        }
+
+        boolean saysAnything = levels.has("mode") || levels.has("gradientPreset")
+                || levels.has("customStops") || levels.has("brackets");
+        if (!saysAnything) {
+            // Nothing on disk is overriding the initialisers, so the bind that follows
+            // already hands this file the v5 palette. Writing it in would be noise.
+            return null;
+        }
+
+        boolean untouched = isV4Mode(levels.get("mode"))
+                && isV4Preset(levels.get("gradientPreset"))
+                && isV4Stops(levels.get("customStops"))
+                && isV4Table(levels.get("brackets"));
+
+        if (!untouched) {
+            if (!levels.has("mode")) {
+                levels.addProperty("mode", LevelColorMode.GRADIENT.name());
+                return "v4->v5: the shipped level palette changed; kept yours, and pinned"
+                        + " mode GRADIENT so the new default cannot move it";
+            }
+            return "v4->v5: the shipped level palette changed; kept yours";
+        }
+
+        levels.addProperty("mode", LevelColorMode.BRACKETS.name());
+        levels.add("brackets", bracketsAsJson(PalettePresets.defaultBrackets().brackets()));
+        return "v4->v5: your level palette was still the old shipped default, so it moved"
+                + " to the new one (" + PalettePresets.defaultBrackets().brackets().size()
+                + " brackets)";
+    }
+
+    /** A bracket list written the way Gson writes {@link BracketTable.Bracket}. */
+    private static JsonArray bracketsAsJson(List<BracketTable.Bracket> brackets) {
+        var array = new JsonArray();
+        for (BracketTable.Bracket b : brackets) {
+            var entry = new JsonObject();
+            entry.addProperty("minLevel", b.minLevel());
+            entry.addProperty("rgb", b.rgb());
+            array.add(entry);
+        }
+        return array;
+    }
+
+    /** Absent, or v4's default mode however it was spelled. */
+    private static boolean isV4Mode(JsonElement element) {
+        if (element == null) {
+            return true;
+        }
+        String name = asTrimmedString(element);
+        return name != null && name.equalsIgnoreCase(V4_DEFAULT_MODE);
+    }
+
+    /**
+     * Absent, or v4's default gradient name, normalised the way the sanitiser normalises a
+     * preset so a file that says {@code "Spectrum"} is recognised as the untouched default
+     * it plainly is.
+     */
+    private static boolean isV4Preset(JsonElement element) {
+        if (element == null) {
+            return true;
+        }
+        String name = asTrimmedString(element);
+        return name != null
+                && name.toLowerCase(Locale.ROOT).replace(' ', '_').equals(V4_DEFAULT_PRESET);
+    }
+
+    /** Absent, or exactly the stop list a v4 install seeded {@code customStops} from. */
+    private static boolean isV4Stops(JsonElement element) {
+        if (element == null) {
+            return true;
+        }
+        List<GradientRamp.Stop> shipped = PalettePresets.defaultRamp().stops();
+        JsonArray array = asArrayOfSize(element, shipped.size());
+        if (array == null) {
+            return false;
+        }
+        for (int i = 0; i < shipped.size(); i++) {
+            JsonObject entry = asObject(array.get(i));
+            if (entry == null
+                    || !isNumber(entry.get("level"), shipped.get(i).level())
+                    || !isNumber(entry.get("rgb"), shipped.get(i).rgb())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Absent, or exactly the table a v4 install seeded {@code brackets} from. */
+    private static boolean isV4Table(JsonElement element) {
+        if (element == null) {
+            return true;
+        }
+        List<BracketTable.Bracket> shipped = PalettePresets.fineBrackets().brackets();
+        JsonArray array = asArrayOfSize(element, shipped.size());
+        if (array == null) {
+            return false;
+        }
+        for (int i = 0; i < shipped.size(); i++) {
+            JsonObject entry = asObject(array.get(i));
+            if (entry == null
+                    || !isNumber(entry.get("minLevel"), shipped.get(i).minLevel())
+                    || !isNumber(entry.get("rgb"), shipped.get(i).rgb())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** The element as an array of exactly {@code size} entries, or null if it is anything else. */
+    private static JsonArray asArrayOfSize(JsonElement element, int size) {
+        if (element == null || !element.isJsonArray()) {
+            return null;
+        }
+        JsonArray array = element.getAsJsonArray();
+        return array.size() == size ? array : null;
+    }
+
+    /** The element as an object, or null if it is missing or some other shape. */
+    private static JsonObject asObject(JsonElement element) {
+        return element != null && element.isJsonObject() ? element.getAsJsonObject() : null;
+    }
+
+    /** Whether the element is a whole number equal to {@code expected}. */
+    private static boolean isNumber(JsonElement element, int expected) {
+        Long value = asLong(element);
+        return value != null && value == expected;
+    }
+
+    /** A primitive read as trimmed text, however it was spelled; null if it is not text. */
+    private static String asTrimmedString(JsonElement element) {
+        if (element == null || !element.isJsonPrimitive()) {
+            return null;
+        }
+        JsonPrimitive p = element.getAsJsonPrimitive();
+        return p.isString() ? p.getAsString().trim() : null;
+    }
+
     /** The {@code loot} group, created empty if the file has none yet. */
     private static JsonObject loot(JsonObject root) {
         JsonObject existing = childObject(root, "loot");
@@ -334,6 +540,17 @@ public final class ConfigMigrations {
         }
         return null;
     }
+
+    /** The level colour mode every build up to schema v4 shipped as its default. */
+    private static final String V4_DEFAULT_MODE = "GRADIENT";
+
+    /**
+     * The gradient every build up to schema v4 shipped as its default, frozen as a literal
+     * rather than read off {@link PalettePresets#DEFAULT_PRESET_NAME}: this is a fact about
+     * what v4 shipped, and it must not follow the constant if a later release renames or
+     * repoints the default ramp.
+     */
+    private static final String V4_DEFAULT_PRESET = "spectrum";
 
     /** The shimmer saturation every build up to schema v2 hard-coded. */
     private static final double V2_CHROMA_SATURATION = 0.90;

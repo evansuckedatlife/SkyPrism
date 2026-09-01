@@ -44,7 +44,15 @@ public final class Palettes {
         SkyPrismConfig.LevelSettings s =
                 settings == null ? SkyPrismConfig.defaults().levels : settings;
 
-        LevelColorMode mode = s.mode == null ? LevelColorMode.GRADIENT : s.mode;
+        // A null mode must land on the same constant SkyPrismConfig.sanitised() picks for it.
+        // These two are the only places a missing mode is filled in, and they are reached by
+        // different roads - sanitised() on the config the mod loads from disk, this method on a
+        // settings object handed straight to /skyprism preview - so a disagreement here would not
+        // crash, it would quietly draw two different palettes from one file. They were allowed to
+        // disagree once already: the shipped default moved to BRACKETS and only the sanitiser was
+        // updated, which left the preview screen predicting a gradient the chat was never going to
+        // render. Same constant, both sides.
+        LevelColorMode mode = s.mode == null ? LevelColorMode.BRACKETS : s.mode;
         GradientRamp ramp = mode == LevelColorMode.GRADIENT ? s.resolveRamp() : null;
         BracketTable table = mode == LevelColorMode.BRACKETS ? s.resolveTable() : null;
 

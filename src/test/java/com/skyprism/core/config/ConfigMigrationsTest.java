@@ -5,13 +5,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.skyprism.core.level.BracketTable;
+import com.skyprism.core.level.GradientRamp;
+import com.skyprism.core.level.LevelColorMode;
+import com.skyprism.core.level.PalettePresets;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -25,6 +31,11 @@ import org.junit.jupiter.api.io.TempDir;
  * bug that does not announce itself: bound without migration the loot window would be
  * fifty times too short and the slot machine would simply appear to be broken, with a
  * perfectly valid-looking config file to prove it was not.
+ *
+ * <p>The v4-to-v5 cases are the other half of that: a rung that must reach the players who
+ * asked for a changed default, and must not touch anyone who picked their own palette. Most
+ * of those tests are there to prove the step does <em>nothing</em>, because a migration that
+ * eats a palette somebody spent an evening on is worse than the change not landing at all.
  */
 class ConfigMigrationsTest {
 
@@ -420,4 +431,260 @@ class ConfigMigrationsTest {
         }
     }
 
+    @Nested
+    @DisplayName("v4 to v5")
+    class V4ToV5 {
+
+        @Test
+        @DisplayName("a palette nobody ever touched moves to the new shipped table")
+        void untouchedPaletteMoves() {
+            var result = ConfigMigrations.migrate(v4File(untouchedV4Levels()));
+
+            assertTrue(result.migrated());
+            JsonObject levels = result.root().getAsJsonObject("levels");
+            assertEquals("BRACKETS", levels.get("mode").getAsString());
+            assertEquals(bracketsJson(PalettePresets.defaultBrackets().brackets()),
+                    levels.get("brackets"));
+            assertEquals(1, result.notes().size(), "notes were " + result.notes());
+            assertTrue(result.notes().get(0).startsWith("v4->v5:"), result.notes().get(0));
+        }
+
+        @Test
+        @DisplayName("neighbouring level settings are not disturbed on the way past")
+        void neighboursSurvive() {
+            JsonObject levels = untouchedV4Levels();
+            levels.addProperty("chromaMinLevel", 350);
+            levels.addProperty("applyToNameTags", false);
+
+            var result = ConfigMigrations.migrate(v4File(levels));
+
+            JsonObject after = result.root().getAsJsonObject("levels");
+            assertEquals(350, after.get("chromaMinLevel").getAsInt());
+            assertFalse(after.get("applyToNameTags").getAsBoolean());
+            assertEquals("spectrum", after.get("gradientPreset").getAsString(),
+                    "the ramp behind the mode switch is left where it was");
+        }
+
+        @Test
+        @DisplayName("one edited custom stop is enough to leave the whole palette alone")
+        void editedCustomStopsStopIt() {
+            JsonObject levels = untouchedV4Levels();
+            // Inert while the preset is still spectrum -- and still proof the player has
+            // been in here moving colours around, which is the whole signal this reads.
+            levels.getAsJsonArray("customStops").get(3).getAsJsonObject()
+                    .addProperty("rgb", 0x123456);
+
+            var result = ConfigMigrations.migrate(v4File(levels));
+
+            JsonObject after = result.root().getAsJsonObject("levels");
+            assertEquals("GRADIENT", after.get("mode").getAsString());
+            assertEquals(bracketsJson(PalettePresets.fineBrackets().brackets()),
+                    after.get("brackets"));
+            assertEquals(0x123456, after.getAsJsonArray("customStops").get(3)
+                    .getAsJsonObject().get("rgb").getAsInt());
+            assertTrue(result.notes().get(0).contains("kept yours"), result.notes().get(0));
+        }
+
+        @Test
+        @DisplayName("a chosen gradient preset is left alone")
+        void chosenPresetIsLeftAlone() {
+            JsonObject levels = untouchedV4Levels();
+            levels.addProperty("gradientPreset", "aurora");
+
+            var result = ConfigMigrations.migrate(v4File(levels));
+
+            JsonObject after = result.root().getAsJsonObject("levels");
+            assertEquals("GRADIENT", after.get("mode").getAsString());
+            assertEquals("aurora", after.get("gradientPreset").getAsString());
+            assertEquals(bracketsJson(PalettePresets.fineBrackets().brackets()),
+                    after.get("brackets"));
+        }
+
+        @Test
+        @DisplayName("an edited bracket table is left alone")
+        void editedTableIsLeftAlone() {
+            JsonObject levels = untouchedV4Levels();
+            levels.getAsJsonArray("brackets").get(0).getAsJsonObject()
+                    .addProperty("rgb", 0xFF00FF);
+
+            var result = ConfigMigrations.migrate(v4File(levels));
+
+            JsonObject after = result.root().getAsJsonObject("levels");
+            assertEquals("GRADIENT", after.get("mode").getAsString());
+            assertEquals(0xFF00FF, after.getAsJsonArray("brackets").get(0)
+                    .getAsJsonObject().get("rgb").getAsInt());
+        }
+
+        @Test
+        @DisplayName("a player who turned the recolour off entirely keeps vanilla mode")
+        void vanillaModeIsLeftAlone() {
+            JsonObject levels = untouchedV4Levels();
+            levels.addProperty("mode", "VANILLA");
+
+            var result = ConfigMigrations.migrate(v4File(levels));
+
+            assertEquals("VANILLA", result.root().getAsJsonObject("levels").get("mode").getAsString());
+        }
+
+        @Test
+        @DisplayName("a player already in bracket mode keeps the table they chose it for")
+        void bracketModeIsLeftAlone() {
+            JsonObject levels = untouchedV4Levels();
+            levels.addProperty("mode", "BRACKETS");
+
+            var result = ConfigMigrations.migrate(v4File(levels));
+
+            JsonObject after = result.root().getAsJsonObject("levels");
+            assertEquals("BRACKETS", after.get("mode").getAsString());
+            assertEquals(bracketsJson(PalettePresets.fineBrackets().brackets()),
+                    after.get("brackets"),
+                    "choosing brackets in v4 may well have meant choosing the fine table");
+            assertTrue(result.notes().get(0).contains("kept yours"), result.notes().get(0));
+        }
+
+        @Test
+        @DisplayName("a v4 file that chose a palette but no mode has the old mode written in")
+        void anAbsentModeIsPinnedWhenThePaletteWasChosen() {
+            JsonObject levels = untouchedV4Levels();
+            levels.remove("mode");
+            levels.addProperty("gradientPreset", "ocean");
+
+            var result = ConfigMigrations.migrate(v4File(levels));
+
+            JsonObject after = result.root().getAsJsonObject("levels");
+            assertEquals("GRADIENT", after.get("mode").getAsString(),
+                    "absent meant GRADIENT in v4 and means BRACKETS in v5, so it is spelled out");
+            assertEquals("ocean", after.get("gradientPreset").getAsString());
+        }
+
+        @Test
+        @DisplayName("a file that says nothing about its palette is left for the bind to fill in")
+        void silenceIsLeftToTheBind() {
+            var root = v4File(new JsonObject());
+            root.getAsJsonObject("levels").addProperty("chromaEnabled", true);
+
+            var result = ConfigMigrations.migrate(root);
+
+            JsonObject after = result.root().getAsJsonObject("levels");
+            assertFalse(after.has("mode"), "nothing on disk was overriding the new default");
+            assertFalse(after.has("brackets"));
+            assertTrue(result.notes().isEmpty(), "notes were " + result.notes());
+        }
+
+        @Test
+        @DisplayName("a file with no levels group at all is untouched")
+        void noLevelsGroupIsNoOp() {
+            var result = ConfigMigrations.migrate(parse("{\"configVersion\": 4}"));
+            assertFalse(result.root().has("levels"));
+            assertTrue(result.notes().isEmpty());
+        }
+
+        @Test
+        @DisplayName("running the ladder twice changes nothing the second time")
+        void isIdempotent() {
+            var once = ConfigMigrations.migrate(v4File(untouchedV4Levels()));
+            String afterOnce = once.root().toString();
+
+            var twice = ConfigMigrations.migrate(once.root());
+
+            assertFalse(twice.migrated());
+            assertTrue(twice.notes().isEmpty());
+            assertEquals(afterOnce, twice.root().toString());
+        }
+
+        @Test
+        @DisplayName("a file already at v5 is left exactly as it is, gradient and all")
+        void aCurrentFileIsLeftAlone() {
+            JsonObject levels = untouchedV4Levels();
+            var root = new JsonObject();
+            root.addProperty("configVersion", SkyPrismConfig.CONFIG_VERSION);
+            root.add("levels", levels);
+            String before = root.toString();
+
+            var result = ConfigMigrations.migrate(root);
+
+            assertFalse(result.migrated());
+            assertEquals(before, result.root().toString(),
+                    "at v5 a spectrum gradient is a choice, not a leftover default");
+        }
+
+        @Test
+        @DisplayName("a v4 file on disk comes back drawing the new table, and stays that way")
+        void v4FileIsUpgradedOnDisk() throws IOException {
+            Path file = dir.resolve("v4.json");
+            Files.writeString(file, v4File(untouchedV4Levels()).toString(), StandardCharsets.UTF_8);
+
+            var result = ConfigCodec.load(file);
+
+            assertEquals(ConfigCodec.Status.MIGRATED, result.status());
+            assertEquals(LevelColorMode.BRACKETS, result.config().levels.mode);
+            assertEquals(PalettePresets.defaultBrackets().brackets(), result.config().levels.brackets);
+
+            var second = ConfigCodec.load(file);
+            assertEquals(ConfigCodec.Status.LOADED, second.status(), "the upgrade is durable");
+            assertEquals(result.config(), second.config());
+        }
+
+        @Test
+        @DisplayName("a v4 file that chose a gradient comes back drawing that gradient")
+        void aChosenPaletteSurvivesTheLoad() throws IOException {
+            JsonObject levels = untouchedV4Levels();
+            levels.addProperty("gradientPreset", "aurora");
+            Path file = dir.resolve("chosen.json");
+            Files.writeString(file, v4File(levels).toString(), StandardCharsets.UTF_8);
+
+            var c = ConfigCodec.loadOrDefaults(file);
+
+            assertEquals(LevelColorMode.GRADIENT, c.levels.mode);
+            assertEquals("aurora", c.levels.gradientPreset);
+            assertEquals(PalettePresets.fineBrackets().brackets(), c.levels.brackets);
+        }
+    }
+
+    /**
+     * The {@code levels} group a v4 install wrote when the player never touched the palette:
+     * every palette field present and spelled out, because {@link ConfigCodec} serialises
+     * every field whether or not anyone chose it. That is exactly what makes the v4-to-v5
+     * step necessary, so the fixture reproduces it rather than writing a tidy subset.
+     */
+    private static JsonObject untouchedV4Levels() {
+        var levels = new JsonObject();
+        levels.addProperty("enabled", true);
+        levels.addProperty("mode", "GRADIENT");
+        levels.addProperty("gradientPreset", "spectrum");
+        levels.add("customStops", stopsJson(PalettePresets.defaultRamp().stops()));
+        levels.add("brackets", bracketsJson(PalettePresets.fineBrackets().brackets()));
+        levels.addProperty("chromaEnabled", false);
+        levels.addProperty("recolourBrackets", true);
+        return levels;
+    }
+
+    private static JsonObject v4File(JsonObject levels) {
+        var root = new JsonObject();
+        root.addProperty("configVersion", 4);
+        root.add("levels", levels);
+        return root;
+    }
+
+    private static JsonArray stopsJson(List<GradientRamp.Stop> stops) {
+        var array = new JsonArray();
+        for (GradientRamp.Stop s : stops) {
+            var entry = new JsonObject();
+            entry.addProperty("level", s.level());
+            entry.addProperty("rgb", s.rgb());
+            array.add(entry);
+        }
+        return array;
+    }
+
+    private static JsonArray bracketsJson(List<BracketTable.Bracket> brackets) {
+        var array = new JsonArray();
+        for (BracketTable.Bracket b : brackets) {
+            var entry = new JsonObject();
+            entry.addProperty("minLevel", b.minLevel());
+            entry.addProperty("rgb", b.rgb());
+            array.add(entry);
+        }
+        return array;
+    }
 }

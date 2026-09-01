@@ -3,6 +3,8 @@ package com.skyprism.mc.selftest;
 import com.skyprism.core.config.SkyPrismConfig;
 import com.skyprism.core.level.LevelPalette;
 import com.skyprism.core.level.LevelTagLocator;
+import com.skyprism.core.level.Oklab;
+import com.skyprism.core.level.PalettePresets;
 import com.skyprism.core.text.StyledRun;
 import com.skyprism.core.diana.DianaGate;
 import com.skyprism.mc.chat.ChatRouter;
@@ -69,14 +71,53 @@ import java.util.Locale;
  * rewriter has no emblem-specific code and must not need any -- an emblem is not bracketed digits,
  * so the locator simply never sees it. This probe exists to demonstrate that claim rather than
  * trust it.</p>
+ *
+ * <h2>Two levels, on purpose, and which one is load bearing</h2>
+ *
+ * <p>The same line is built twice, once at level 451 and once at level 521, because the shipped
+ * table is two different animals either side of 480 and only one of them can prove the mod is
+ * running.</p>
+ *
+ * <ul>
+ *   <li><b>451</b> sits in the half of the table sampled off Hypixel's own hexlist, so a correct
+ *       recolour there lands <em>near</em> what the server sent. That makes it a good test of
+ *       faithfulness -- the familiar colours are still familiar -- and a bad test of activity:
+ *       "the tag changed" is close to unfalsifiable when the before and after are cousins.</li>
+ *   <li><b>521</b> sits above Hypixel's last tier, where an unmodded client shows {@code #AA0000}
+ *       and goes on showing it at 600 and at 900. The shipped table spends its own colours here.
+ *       So this is the line the probe leans on, and it is checked with a perceptual distance
+ *       rather than {@code !=}: the regression worth catching is not "the colour is byte-identical
+ *       to the server's", it is "the mod stopped doing anything a player could see", and only a
+ *       measured distance can tell those apart.</li>
+ * </ul>
  */
 final class RecolourProbe {
 
     private RecolourProbe() {
     }
 
-    /** The level in the fixture tag. */
+    /**
+     * The level in the first fixture tag: below 480, where the shipped table is sampled off
+     * Hypixel's own hexlist.
+     *
+     * <p>This one proves the vanilla-derived half of the table is <em>faithful</em> - that a
+     * player at 451 still reads as the colour the rest of the lobby expects. It is deliberately
+     * not the check that proves the mod is doing anything, and it cannot be: below 480 the
+     * shipped colours are derived from the very colours Hypixel sends, so "recoloured" and
+     * "left alone" land close together there by design. {@link #HIGH_LEVEL} carries that
+     * burden instead.</p>
+     */
     private static final int LEVEL = 451;
+
+    /**
+     * The level in the second fixture tag: above 480, where SkyPrism's own hues live.
+     *
+     * <p>480 is Hypixel's last tier. Every level above it - 481, 600, 900 - is the same dark
+     * red on an unmodded client, forever, so this is the range where the mod has something to
+     * say that the server does not, and the only range where "the tag changed colour" is a
+     * claim with real content behind it.</p>
+     */
+    private static final int HIGH_LEVEL = 521;
 
     /**
      * The instant the deterministic run pretends it is.
@@ -86,8 +127,41 @@ final class RecolourProbe {
      */
     private static final long FIXED_MILLIS = 1_700_000_000_000L;
 
-    /** Hypixel colour for the level tag in the fixture: the purple it sends for a mid-tier level. */
+    /**
+     * The colour the first fixture claims Hypixel sent for level 451.
+     *
+     * <p><b>This is not what Hypixel actually sends there</b>, and the difference is load
+     * bearing, so it is written down rather than quietly corrected. Level 451 falls in
+     * Hypixel's 440 tier, which is {@code #FF5555}; this fixture says {@code #AA00AA}, the
+     * 360 tier. That accident is the only reason the six checks on this line still have
+     * teeth - they compare the recoloured tag against a source colour far enough away to
+     * notice. Set this to the truthful {@code #FF5555} and every one of them would still
+     * pass while measuring almost nothing, because the shipped table below 480 is sampled
+     * off that same hexlist. Anyone tempted to make the fixture more honest should move the
+     * teeth to {@link #HIGH_TAG_SOURCE_RGB} first, where they do not depend on a mistake.</p>
+     */
     private static final int TAG_SOURCE_RGB = 0xAA00AA;
+
+    /**
+     * The colour Hypixel really does send for level 521: its last tier, dark red.
+     *
+     * <p>Unlike {@link #TAG_SOURCE_RGB} this is verbatim - {@code PalettePresets}' top vanilla
+     * tier, the colour an unmodded client puts on every level from 480 up. A recolour away
+     * from it is the mod visibly working.</p>
+     */
+    private static final int HIGH_TAG_SOURCE_RGB = 0xAA0000;
+
+    /**
+     * How far apart two colours must sit in Oklab before a player can tell them apart.
+     *
+     * <p>Roughly the just-noticeable difference, and the same order the palette's own design
+     * notes use: adjacent stops on the shipped ramp are about 0.045 apart, described there as
+     * "twice over the threshold where two colours stop being tellable apart". Asserting a
+     * distance rather than {@code !=} is the whole point of the high-level checks: a mod that
+     * recoloured 521 to {@code #AA0001} would satisfy inequality and be indistinguishable from
+     * a mod that had stopped running.</p>
+     */
+    private static final double VISIBLE_DISTANCE = 0.02;
 
     /** The rank prefix colour. */
     private static final int RANK_RGB = 0x55FFFF;
@@ -115,14 +189,15 @@ final class RecolourProbe {
     }
 
     /**
-     * Builds the fixture, rewrites it both ways, checks six claims and writes the report.
+     * Builds both fixtures, rewrites them, checks nine claims and writes the report.
      *
      * @param reportFile where to write the plain-text write-up
      * @return the outcome; this method does not throw
      */
     static Result run(Path reportFile) {
-        List<Check> checks = new ArrayList<>(8);
-        StringBuilder out = new StringBuilder(4096);
+        List<Check> checks = new ArrayList<>(12);
+        // Two fixtures, three dumps each, so the write-up is about twice what it was.
+        StringBuilder out = new StringBuilder(8192);
         try {
             probe(checks, out);
         } catch (Throwable broken) {
@@ -181,12 +256,18 @@ final class RecolourProbe {
         LevelTagLocator locator = ConfigManager.get().locator();
         boolean brackets = config.levels.recolourBrackets;
 
-        Component before = fixture();
+        Component before = fixture(LEVEL, TAG_SOURCE_RGB);
         Component fixed = ComponentRewriter.recolourLevels(before, palette, locator, brackets,
                 FIXED_MILLIS);
         Component live = liveRecolour(before, config);
 
+        Component highBefore = fixture(HIGH_LEVEL, HIGH_TAG_SOURCE_RGB);
+        Component highFixed = ComponentRewriter.recolourLevels(highBefore, palette, locator,
+                brackets, FIXED_MILLIS);
+        Component highLive = liveRecolour(highBefore, config);
+
         int expected = palette.colorFor(LEVEL, FIXED_MILLIS);
+        int highExpected = palette.colorFor(HIGH_LEVEL, FIXED_MILLIS);
 
         // Which run the recoloured tag ends up in, which is not a constant: the rewriter emits
         // one run per contiguous span of one style, so tinting the brackets merges "[", the
@@ -194,13 +275,18 @@ final class RecolourProbe {
         // a run of their own. Both are correct; a probe that only knew the second shape reported
         // three failures the moment the shipped default flipped, which is a probe reporting on
         // itself rather than on the mod.
-        String tagRun = brackets ? "[" + LEVEL + "]" : String.valueOf(LEVEL);
+        String tagRun = tagRunText(LEVEL, brackets);
+        String highTagRun = tagRunText(HIGH_LEVEL, brackets);
 
-        header(out, config, palette, locator, brackets, expected);
-        dump(out, "BEFORE", before);
-        dump(out, "AFTER (deterministic, ComponentRewriter.recolourLevels at t=" + FIXED_MILLIS + ")",
-                fixed);
-        dump(out, "AFTER (live, ChatRouter.modifyGameMessage)", live);
+        header(out, config, palette, locator, brackets, expected, highExpected);
+        dump(out, "BEFORE (level " + LEVEL + ")", before);
+        dump(out, "AFTER (level " + LEVEL + ", deterministic, ComponentRewriter.recolourLevels at t="
+                + FIXED_MILLIS + ")", fixed);
+        dump(out, "AFTER (level " + LEVEL + ", live, ChatRouter.modifyGameMessage)", live);
+        dump(out, "BEFORE (level " + HIGH_LEVEL + ")", highBefore);
+        dump(out, "AFTER (level " + HIGH_LEVEL + ", deterministic, ComponentRewriter.recolourLevels "
+                + "at t=" + FIXED_MILLIS + ")", highFixed);
+        dump(out, "AFTER (level " + HIGH_LEVEL + ", live, ChatRouter.modifyGameMessage)", highLive);
 
         // 1. The rewriter must not be a no-op, or every check below would pass vacuously.
         checks.add(new Check("the rewriter rewrote something",
@@ -286,6 +372,103 @@ final class RecolourProbe {
                         + "; the server sent " + hex(TAG_SOURCE_RGB)
                         + " (chroma is on, so the exact value moves with the clock; the SkyBlock "
                         + "condition is forced for this call, see liveRecolour)"));
+
+        // ---------------------------------------------------------- above Hypixel's last tier
+        //
+        // Everything above this line can be satisfied by a table that merely echoes Hypixel back,
+        // because below 480 the shipped colours are drawn from Hypixel's own. These three cannot.
+        // 480 is the last tier the server has; from there up it sends one flat dark red forever,
+        // so this is the only stretch of the ladder where the mod's output is its own work and the
+        // only place a "the recolour silently stopped" regression has nowhere to hide.
+
+        // 7. Same exactness as check 3, one tier past where the server ran out of colours.
+        Integer highDigits = colourOf(highFixed, highTagRun);
+        checks.add(new Check("the level " + HIGH_LEVEL + " tag was recoloured to the palette colour",
+                highDigits != null && highDigits == highExpected,
+                "run " + quote(highTagRun) + " is " + hex(highDigits)
+                        + ", palette.colorFor(" + HIGH_LEVEL + ", " + FIXED_MILLIS + ") is "
+                        + hex(highExpected) + ", server sent " + hex(HIGH_TAG_SOURCE_RGB)));
+
+        // 8. The one that gives this whole probe teeth. Equality against the palette proves the
+        //    rewriter and the palette agree; it does not prove the palette is saying anything.
+        //    A distance does. If the level module were gutted tomorrow and every tag came back
+        //    wearing the server's own colour, checks 1, 3 and 7 could all still be arranged to
+        //    pass -- this one could not.
+        double highDrift = highDigits == null
+                ? 0.0
+                : distance(highDigits, HIGH_TAG_SOURCE_RGB);
+        checks.add(new Check("the level " + HIGH_LEVEL + " recolour is VISIBLE, not just different",
+                highDigits != null && highDrift >= VISIBLE_DISTANCE,
+                "Oklab distance from the unmodded colour " + hex(HIGH_TAG_SOURCE_RGB) + " to "
+                        + hex(highDigits) + " is " + fixed3(highDrift) + ", threshold "
+                        + fixed3(VISIBLE_DISTANCE) + " (an unmodded client shows " + HIGH_LEVEL
+                        + ", 600 and 900 all as " + hex(HIGH_TAG_SOURCE_RGB) + "; if this fails "
+                        + "with mode=" + palette.mode() + " the palette is echoing the server "
+                        + "back and no player would see the mod working up here)"));
+
+        // 9. And the same claim through the callback Fabric actually calls.
+        Integer highLiveDigits = colourOf(highLive, highTagRun);
+        double highLiveDrift = highLiveDigits == null
+                ? 0.0
+                : distance(highLiveDigits, HIGH_TAG_SOURCE_RGB);
+        checks.add(new Check("the live chat callback recolours " + HIGH_LEVEL + " visibly too",
+                highLiveDigits != null && highLiveDrift >= VISIBLE_DISTANCE,
+                "ChatRouter.modifyGameMessage left run " + quote(highTagRun) + " at "
+                        + hex(highLiveDigits) + ", Oklab distance " + fixed3(highLiveDrift)
+                        + " from " + hex(HIGH_TAG_SOURCE_RGB) + " (the exact value moves with the "
+                        + "clock when chroma reaches this level, but the distance does not: the "
+                        + "shimmer runs far lighter and more saturated than a dark red)"));
+
+        // Not a check, on purpose. The faithfulness half of the story - that 451 still reads as
+        // the colour the rest of the lobby expects - is a claim about which points the palette
+        // module chose to sample off the vanilla hexlist, and pinning a threshold on it here
+        // would make this probe fail every time that module legitimately retunes a bracket.
+        // The number is printed instead, for a human reading the report to eyeball.
+        out.append("== faithfulness below 480 (reported, not asserted) ==\n")
+                .append("  Hypixel's own tier colour at level ").append(LEVEL).append(" is ")
+                .append(hex(vanillaTierColour(LEVEL))).append("; the shipped palette says ")
+                .append(hex(expected)).append(", Oklab distance ")
+                .append(fixed3(distance(expected, vanillaTierColour(LEVEL)))).append(".\n")
+                .append("  For scale, the same figure at level ").append(HIGH_LEVEL)
+                .append(" - where the palette is deliberately NOT following Hypixel - is ")
+                .append(fixed3(highDrift)).append(".\n")
+                .append("  Below 480 the small number is the point; above it, the large one is.\n\n");
+    }
+
+    /**
+     * The run text the recoloured tag ends up in.
+     *
+     * <p>Not a constant: the rewriter emits one run per contiguous span of one style, so tinting
+     * the brackets merges them into the digits and leaving them alone does not.</p>
+     */
+    private static String tagRunText(int level, boolean recolourBrackets) {
+        return recolourBrackets ? "[" + level + "]" : String.valueOf(level);
+    }
+
+    /**
+     * Perceptual distance between two packed sRGB colours, in Oklab.
+     *
+     * <p>Plain Euclidean distance over {@code L, a, b}, which is what Oklab is built for: equal
+     * numeric steps are meant to look like equal perceptual steps, so a single threshold means
+     * the same thing at every hue. Comparing sRGB channels instead would call a dark red and a
+     * dark blue further apart than a pale yellow and a white, which is backwards.</p>
+     */
+    private static double distance(int rgbA, int rgbB) {
+        double[] p = Oklab.srgbToOklab(rgbA);
+        double[] q = Oklab.srgbToOklab(rgbB);
+        double dL = p[0] - q[0];
+        double da = p[1] - q[1];
+        double db = p[2] - q[2];
+        return Math.sqrt(dL * dL + da * da + db * db);
+    }
+
+    /** What an unmodded client shows at this level, straight off Hypixel's tier table. */
+    private static int vanillaTierColour(int level) {
+        return PalettePresets.vanillaBrackets().colorAt(level);
+    }
+
+    private static String fixed3(double value) {
+        return String.format(Locale.ROOT, "%.3f", value);
     }
 
     /**
@@ -321,11 +504,20 @@ final class RecolourProbe {
      * <p>The root carries bold so the probe also proves that an inherited style reaches the runs:
      * a child style says "inherit" with a null, and a rewriter that resolved the merge in the wrong
      * order would silently drop the parent formatting along with its hover event.</p>
+     *
+     * <p>Only the tag varies between the two fixtures. Everything to the right of it - the split
+     * rank prefix, the interactive name, the emblem, the out-of-range number in the body - is
+     * identical, because those runs are testing the rewriter's handling of neighbours and that
+     * has nothing to do with which level is in the tag. Building both lines from one method also
+     * means the second fixture cannot drift into being an easier case than the first.</p>
+     *
+     * @param level  the level in the tag
+     * @param tagRgb the colour the server is pretending to have sent for it
      */
-    private static Component fixture() {
+    private static Component fixture(int level, int tagRgb) {
         MutableComponent tree = Component.literal("").setStyle(Style.EMPTY.withBold(true));
-        tree.append(Component.literal("[" + LEVEL + "] ")
-                .setStyle(Style.EMPTY.withColor(TAG_SOURCE_RGB)));
+        tree.append(Component.literal("[" + level + "] ")
+                .setStyle(Style.EMPTY.withColor(tagRgb)));
         tree.append(Component.literal("[MVP").setStyle(Style.EMPTY.withColor(RANK_RGB)));
         tree.append(Component.literal("+").setStyle(Style.EMPTY.withColor(RANK_PLUS_RGB)));
         tree.append(Component.literal("] ").setStyle(Style.EMPTY.withColor(RANK_RGB)));
@@ -343,11 +535,13 @@ final class RecolourProbe {
     // ------------------------------------------------------------------ reporting
 
     private static void header(StringBuilder out, SkyPrismConfig config, LevelPalette palette,
-                               LevelTagLocator locator, boolean brackets, int expected) {
+                               LevelTagLocator locator, boolean brackets, int expected,
+                               int highExpected) {
         out.append("SkyPrism level-recolour probe\n")
                 .append("=============================\n\n")
-                .append("No server, no Hypixel: a synthetic Component tree is pushed through the "
-                        + "same\ntwo entry points a real chat line takes.\n\n")
+                .append("No server, no Hypixel: two synthetic Component trees, one tagged below "
+                        + "Hypixel's\nlast tier and one above it, are pushed through the same two "
+                        + "entry points a real\nchat line takes.\n\n")
                 .append("palette          : ").append(palette).append('\n')
                 .append("locator          : ").append(locator).append('\n')
                 .append("mode             : ").append(palette.mode()).append('\n')
@@ -359,7 +553,12 @@ final class RecolourProbe {
                 .append("recolourBrackets : ").append(brackets).append('\n')
                 .append("applyToChat      : ").append(config.levels.applyToChat).append('\n')
                 .append("expected colour  : level ").append(LEVEL).append(" at t=")
-                .append(FIXED_MILLIS).append(" is ").append(hex(expected)).append("\n\n");
+                .append(FIXED_MILLIS).append(" is ").append(hex(expected))
+                .append(" (server sent ").append(hex(TAG_SOURCE_RGB)).append(")\n")
+                .append("                 : level ").append(HIGH_LEVEL).append(" at t=")
+                .append(FIXED_MILLIS).append(" is ").append(hex(highExpected))
+                .append(" (server sent ").append(hex(HIGH_TAG_SOURCE_RGB))
+                .append(", its last tier)\n\n");
     }
 
     /**

@@ -3,11 +3,17 @@
   "id": "${id}",
   "version": "${version}",
   "name": "${name}",
-  "description": "A Fabric client mod for Hypixel SkyBlock.",
+  "description": "Recolours your Hypixel SkyBlock level prefix every 20 levels instead of 40, in Hypixel's own palette, with 13 new shades above 480. Every lucky drop, across 64 sources, spins a slot machine that lands on the loot you actually got.",
   "authors": [
     "evansuckedatlife"
   ],
+  "contact": {
+    "homepage": "https://github.com/evansuckedatlife/SkyPrism",
+    "sources": "https://github.com/evansuckedatlife/SkyPrism",
+    "issues": "https://github.com/evansuckedatlife/SkyPrism/issues"
+  },
   "license": "MIT",
+  "icon": "assets/skyprism/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": [
@@ -28,5 +34,8 @@
   },
   "recommends": {
     "yet_another_config_lib_v3": ">=3.9.5"
+  },
+  "suggests": {
+    "modmenu": "*"
   }
 }

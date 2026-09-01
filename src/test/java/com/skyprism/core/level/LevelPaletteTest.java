@@ -3,6 +3,7 @@ package com.skyprism.core.level;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -161,22 +162,30 @@ class LevelPaletteTest {
     }
 
     @Test
-    @DisplayName("defaults() is the shipped default ramp, static, with the shimmer off")
+    @DisplayName("defaults() is the shipped default bracket table, static, with the shimmer off")
     void defaultsAreSaneBeforeAnyConfigLoads() {
         var p = LevelPalette.defaults();
-        assertEquals(LevelColorMode.GRADIENT, p.mode());
+        assertEquals(LevelColorMode.BRACKETS, p.mode());
         assertFalse(p.chromaEnabled());
         assertFalse(p.isChromatic(Integer.MAX_VALUE));
 
-        // Pinned to the ramp itself rather than to two literal colours. The no-config fallback
+        // Pinned to the table itself rather than to two literal colours. The no-config fallback
         // and the shipped config must agree -- they did not, once, and every client that failed
         // to read its config drew a different gradient from every client that read it fine. A
         // literal here would have gone on passing through exactly that bug.
-        assertEquals(PalettePresets.defaultRamp(), p.ramp());
-        for (int level = 0; level <= 600; level += 20) {
-            assertEquals(PalettePresets.defaultRamp().colorAt(level), p.colorFor(level, 0L),
+        //
+        // The mode is half of that agreement and is asserted above: when the shipped default
+        // moved from a gradient to a table, a defaults() left on GRADIENT would have reproduced
+        // the same bug with the same symptoms. BracketTable has no equals(), so identity is the
+        // check -- both sides are meant to be the one shared singleton, not two equal copies.
+        assertSame(PalettePresets.defaultBrackets(), p.table());
+        for (int level = 0; level <= 700; level += 10) {
+            assertEquals(PalettePresets.defaultBrackets().colorAt(level), p.colorFor(level, 0L),
                 "level " + level);
         }
+        // The unused slot still carries the shipped gradient rather than a null, so flipping
+        // the mode on this palette cannot NPE.
+        assertEquals(PalettePresets.defaultRamp(), p.ramp());
     }
 
     @Test

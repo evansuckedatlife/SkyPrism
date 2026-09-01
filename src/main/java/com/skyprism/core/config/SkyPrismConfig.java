@@ -55,9 +55,20 @@ public final class SkyPrismConfig {
     /**
      * Schema version this build writes and understands.
      *
-     * <p>Bumped whenever the JSON shape changes in a way a straight Gson bind would get
-     * wrong -- a renamed field, a changed unit, a re-keyed enum. Adding a field does not
-     * need a bump, because absent fields already fall back to their initialisers.
+     * <p>Bumped whenever a straight Gson bind of an older file would get something wrong.
+     * Usually that means the JSON <em>shape</em> changed -- a renamed field, a changed
+     * unit, a re-keyed enum -- and adding a field needs no bump at all, because an absent
+     * field already falls back to its initialiser.
+     *
+     * <p><b>But "the shape changed" is the common case of the rule, not the rule.</b> The
+     * rule is that the version is the only thing in the file that can tell "this was
+     * written before we changed our minds" apart from "this is what the player chose",
+     * and a bind cannot make that distinction on its own. {@link ConfigCodec} writes every
+     * field out, so a default this release changes is still sitting in every file on disk
+     * spelled out in full, and flipping the initialiser reaches nobody who already has the
+     * mod installed. When a changed default is worth delivering to existing installs, the
+     * ladder is the mechanism, and a bump is what gives the ladder a rung to hang the
+     * decision on. v5 is that case; see below.
      *
      * <p>v3 is the exception that proves that rule. {@code levels.chromaSaturation} and
      * {@code levels.chromaLightness} are new fields, so a straight bind of a v2 file would
@@ -74,8 +85,18 @@ public final class SkyPrismConfig {
      * in v3 did so with {@code diana.enabled}, a field that in v4 governs Diana alone -- so a
      * straight bind hands them back the thing they switched off, on content they have never seen
      * it on. {@link ConfigMigrations} carries that decision across instead.
+     *
+     * <p>v5 changes no shape whatsoever. It exists because the shipped level palette
+     * changed -- from a per-level gradient to a bracket table that keeps Hypixel's tiers
+     * recognisable below 480 and spends SkyPrism's own colours above it -- after three
+     * players said in as many words that the gradient recoloured too often. Every one of
+     * them already has {@code "mode": "GRADIENT"} and {@code "gradientPreset": "spectrum"}
+     * written into their file, so moving the initialisers alone would have shipped the fix
+     * to strangers and left the people who asked for it looking at the palette they
+     * complained about. The bump gives {@link ConfigMigrations} a rung on which it can
+     * tell an untouched pre-v5 palette from a chosen one, and rewrite only the former.
      */
-    public static final int CONFIG_VERSION = 4;
+    public static final int CONFIG_VERSION = 5;
 
     /** Schema version of the file this was read from; see {@link ConfigMigrations}. */
     public int configVersion = CONFIG_VERSION;
@@ -395,8 +416,21 @@ public final class SkyPrismConfig {
         /** Master switch for the whole recolour. Off leaves Hypixel's own colours alone. */
         public boolean enabled = true;
 
-        /** Which of the three colour sources is live. */
-        public LevelColorMode mode = LevelColorMode.GRADIENT;
+        /**
+         * Which of the three colour sources is live.
+         *
+         * <p>Ships in {@link LevelColorMode#BRACKETS}, drawing
+         * {@link PalettePresets#defaultBrackets()}. A gradient gives every single level its
+         * own shade, which sounds like more information and reads as noise: the colour
+         * shifts between two players one level apart, so no colour ever comes to mean a
+         * band. Brackets make the colour a landmark again -- and the shipped table still
+         * changes twice as often as Hypixel's own below 480, and far more often above it,
+         * so the resolution the gradient was there for is not lost.
+         *
+         * <p>{@link LevelColorMode#GRADIENT} is one dropdown entry away and every ramp is
+         * still shipped, so this is a change of default and not a removal.
+         */
+        public LevelColorMode mode = LevelColorMode.BRACKETS;
 
         /**
          * A key of {@link PalettePresets#gradients()}, or {@link #CUSTOM_PRESET}.
@@ -415,9 +449,20 @@ public final class SkyPrismConfig {
         public List<GradientRamp.Stop> customStops =
                 new ArrayList<>(PalettePresets.defaultRamp().stops());
 
-        /** The user's own step table, used in {@link LevelColorMode#BRACKETS}. */
+        /**
+         * The user's own step table, used in {@link LevelColorMode#BRACKETS} -- which is
+         * the shipped mode, so on a fresh install this is the palette the player sees.
+         *
+         * <p>Seeded from {@link PalettePresets#defaultBrackets()}: twenty-level bands
+         * sampled off Hypixel's own hexlist up to 480, then ten-level bands of SkyPrism's
+         * own hues above it, where Hypixel has run out of tiers and paints every remaining
+         * level the same dark red. {@link PalettePresets#fineBrackets()} is what this
+         * seeded from before v5 and is still shipped; the migration in
+         * {@link ConfigMigrations} treats a file still holding it exactly as it treats a
+         * file still holding the old gradient default.
+         */
         public List<BracketTable.Bracket> brackets =
-                new ArrayList<>(PalettePresets.fineBrackets().brackets());
+                new ArrayList<>(PalettePresets.defaultBrackets().brackets());
 
         /** Whether high-level tags get the animated hue sweep on top of their base colour. */
         public boolean chromaEnabled = false;
@@ -568,7 +613,7 @@ public final class SkyPrismConfig {
             try {
                 return new BracketTable(brackets);
             } catch (RuntimeException unusable) {
-                return PalettePresets.fineBrackets();
+                return PalettePresets.defaultBrackets();
             }
         }
 
@@ -589,7 +634,7 @@ public final class SkyPrismConfig {
         LevelSettings sanitizedCopy() {
             var out = new LevelSettings();
             out.enabled = enabled;
-            out.mode = mode == null ? LevelColorMode.GRADIENT : mode;
+            out.mode = mode == null ? LevelColorMode.BRACKETS : mode;
             out.gradientPreset = sanitizePreset(gradientPreset);
             out.customStops = sanitizeStops(customStops);
             out.brackets = sanitizeBrackets(brackets);
@@ -708,7 +753,8 @@ public final class SkyPrismConfig {
                     }
                 }
             }
-            return out.isEmpty() ? new ArrayList<>(PalettePresets.fineBrackets().brackets()) : out;
+            return out.isEmpty()
+                    ? new ArrayList<>(PalettePresets.defaultBrackets().brackets()) : out;
         }
 
         @Override
